@@ -660,19 +660,6 @@ export default function AppleNumberGame() {
                 </span>
               </Button>
             </div>
-
-            {/* 타이머 영역 - 게임 화면과 동일한 레이아웃 유지 */}
-            <div className="ml-2 w-8 bg-green-100 rounded-lg flex items-center justify-center">
-              <div className="h-[90%] w-6 bg-white rounded-full overflow-hidden relative">
-                <div
-                  className="bg-green-500 w-full rounded-full absolute bottom-0"
-                  style={{
-                    height: "100%",
-                    transition: "height 1s linear",
-                  }}
-                />
-              </div>
-            </div>
           </div>
 
           {/* Audio element - using a direct DOM element */}
