@@ -679,44 +679,7 @@ export default function AppleNumberGame() {
               </Button>
             </div>
           </div>
-
-          {/* Audio element - using a direct DOM element */}
-          <audio id="bgm-audio" src="/sounds/bgm.mp3" loop preload="auto" style={{ display: "none" }} />
-
-          {/* Controls */}
-          <div className="flex items-center justify-between mt-4">
-            <div></div> {/* 왼쪽 빈 공간 */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="eye-comfort"
-                  checked={eyeComfortMode}
-                  onCheckedChange={handleEyeComfortToggle}
-                  className="border-white data-[state=checked]:bg-white data-[state=checked]:text-green-500"
-                />
-                <label htmlFor="eye-comfort" className="text-white font-medium">
-                  눈아파요
-                </label>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="bgm"
-                  checked={bgmEnabled}
-                  onCheckedChange={handleBgmToggle}
-                  className="border-white data-[state=checked]:bg-white data-[state=checked]:text-green-500"
-                />
-                <label htmlFor="bgm" className="text-white font-medium">
-                  BGM
-                </label>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Volume2 className="h-5 w-5 text-white" />
-                <Slider value={[volume]} max={100} step={1} className="w-24" onValueChange={handleVolumeChange} />
-              </div>
-            </div>
-          </div>
+         
         </div>
       </div>
     )
