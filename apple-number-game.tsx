@@ -49,6 +49,7 @@ export default function AppleNumberGame() {
     random: 3,
     reset: 1,
   })
+  const [eyeComfortMode, setEyeComfortMode] = useState(false)
 
   const gameAreaRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -104,6 +105,16 @@ export default function AppleNumberGame() {
       random: 3,
       reset: 1,
     })
+
+    // BGM 시작 - 약간의 지연 후 실행
+    setTimeout(() => {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0
+        if (bgmEnabled) {
+          tryPlayAudio()
+        }
+      }
+    }, 100)
   }
 
   // Handle keyboard shortcuts
@@ -514,6 +525,13 @@ export default function AppleNumberGame() {
     }
   }
 
+  // 눈아파요 모드 토글
+  const handleEyeComfortToggle = (checked: boolean | "indeterminate") => {
+    if (typeof checked === "boolean") {
+      setEyeComfortMode(checked)
+    }
+  }
+
   // Handle volume change
   const handleVolumeChange = (newVolume: number[]) => {
     const vol = newVolume[0]
@@ -671,6 +689,18 @@ export default function AppleNumberGame() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Checkbox
+                  id="eye-comfort"
+                  checked={eyeComfortMode}
+                  onCheckedChange={handleEyeComfortToggle}
+                  className="border-white data-[state=checked]:bg-white data-[state=checked]:text-green-500"
+                />
+                <label htmlFor="eye-comfort" className="text-white font-medium">
+                  눈아파요
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Checkbox
                   id="bgm"
                   checked={bgmEnabled}
                   onCheckedChange={handleBgmToggle}
@@ -796,7 +826,15 @@ export default function AppleNumberGame() {
                         <svg viewBox="0 0 24 24" className="w-full h-full">
                           <path
                             d="M12,3.5c-0.8-0.5-2.2-0.5-3-0.3C7.2,3.6,6,4.8,6,7c-1.8,0.5-3,1.8-3,3.5c0,1,0.2,2.3,0.8,3.5c0.7,1.5,1.7,2.7,3,3.5C8.5,18.8,10.2,19,12,19c1.8,0,3.5-0.2,5.2-1.5c1.3-0.8,2.3-2,3-3.5c0.6-1.2,0.8-2.5,0.8-3.5c0-1.7-1.2-3-3-3.5c0-2.2-1.2-3.4-3-3.8C14.2,3,12.8,3,12,3.5z"
-                            fill={apple.selected && isValidSelection ? "#FF0000" : "#FF3B30"}
+                            fill={
+                              apple.selected && isValidSelection
+                                ? eyeComfortMode
+                                  ? "#FF9999"
+                                  : "#FF0000"
+                                : eyeComfortMode
+                                  ? "#FFAA99"
+                                  : "#FF3B30"
+                            }
                           />
                           <path
                             d="M12,2c-0.5,0-1,0.5-1,1c0,0.3,0.1,0.5,0.2,0.7c0.1,0.1,0.2,0.2,0.3,0.3c0.3,0.1,0.7,0.1,1,0c0.1-0.1,0.2-0.2,0.3-0.3C12.9,3.5,13,3.3,13,3C13,2.5,12.5,2,12,2z"
@@ -869,6 +907,18 @@ export default function AppleNumberGame() {
           </Button>
 
           <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="eye-comfort-game"
+                checked={eyeComfortMode}
+                onCheckedChange={handleEyeComfortToggle}
+                className="border-white data-[state=checked]:bg-white data-[state=checked]:text-green-500"
+              />
+              <label htmlFor="eye-comfort-game" className="text-white">
+                눈아파요
+              </label>
+            </div>
+
             <div className="flex items-center gap-2">
               <Checkbox
                 id="bgm"
