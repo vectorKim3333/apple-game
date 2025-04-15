@@ -767,10 +767,10 @@ export default function AppleNumberGame() {
               {score}
             </div>
 
-            {/* Grid of apples */}
+            {/* Grid of apples - 고정 높이 추가 */}
             <div
               ref={gridRef}
-              className="grid grid-cols-17 gap-0.5 mb-4 relative mt-12"
+              className="grid grid-cols-17 gap-0.5 mb-4 relative mt-12 h-[440px]"
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -779,7 +779,7 @@ export default function AppleNumberGame() {
               {apples.map((row, rowIndex) =>
                 row.map((apple, colIndex) => (
                   <div key={apple.id} className="flex items-center justify-center">
-                    {!apple.removed && (
+                    {!apple.removed ? (
                       <div
                         className={`relative w-11 h-11 flex items-center justify-center transition-all duration-100 
                           ${apple.selected ? (isValidSelection ? "scale-110" : "scale-95 opacity-70") : ""}
@@ -810,6 +810,9 @@ export default function AppleNumberGame() {
                         </svg>
                         <span className="absolute text-white font-bold text-lg">{apple.value}</span>
                       </div>
+                    ) : (
+                      // 제거된 사과는 투명한 공간으로 유지
+                      <div className="w-11 h-11 opacity-0"></div>
                     )}
                   </div>
                 )),
