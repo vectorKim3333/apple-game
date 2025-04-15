@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { ThemeProvider } from 'next-themes'
+import { Analytics } from '@vercel/analytics/react'
 
 export const metadata: Metadata = {
-  title: '게임',
-  description: '게임',
+  title: '사과 숫자 게임',
+  description: '숫자를 맞추면서 사과를 모아보세요!',
 }
 
 export default function RootLayout({
@@ -13,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="ko" suppressHydrationWarning>
       <head>
         {/* Google AdSense 스크립트 */}
         <script
@@ -31,6 +32,7 @@ export default function RootLayout({
         >
           {children}
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   )
