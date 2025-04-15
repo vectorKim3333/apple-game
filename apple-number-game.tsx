@@ -679,7 +679,7 @@ export default function AppleNumberGame() {
               </Button>
             </div>
           </div>
-         
+          <audio id="bgm-audio" src="/sounds/bgm.mp3" loop preload="auto" style={{ display: "none" }} />
         </div>
       </div>
     )
