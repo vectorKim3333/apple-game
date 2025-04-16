@@ -1,0 +1,19 @@
+# Allow Google crawlers
+User-agent: Googlebot
+Allow: /
+User-agent: Googlebot-Image
+Allow: /
+User-agent: Googlebot-Mobile
+Allow: /
+User-agent: Googlebot-News
+Allow: /
+User-agent: Google-Site-Verification
+Allow: /
+
+# Block other crawlers
+User-agent: *
+Disallow: /api/
+Allow: /
+
+# Sitemap
+Sitemap: https://apple-game-beta.vercel.app/sitemap.xml 
