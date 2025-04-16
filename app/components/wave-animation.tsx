@@ -1,6 +1,9 @@
 "use client"
 
 import { useRef, useEffect, useCallback, useState } from "react"
+import { WAVE_CONSTANTS, WAVE_COLORS } from '../constants/wave-animation'
+import { useWaveAnimation } from '../hooks/useWaveAnimation'
+import { useCanvasInteraction } from '../hooks/useCanvasInteraction'
 
 interface WaveRectangleProps {
   width: number
@@ -43,6 +46,133 @@ interface HoldState {
   initialY: number
   stoneDropped: boolean
   grownSize: number
+}
+
+interface WaveAnimationProps {
+  onStoneCountChange?: (count: number) => void
+  stoneImage?: string
+  maxStones?: number
+}
+
+export const WaveAnimation = ({ onStoneCountChange, stoneImage, maxStones = 10 }: WaveAnimationProps) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const contextRef = useRef<CanvasRenderingContext2D | null>(null)
+  const waterLevelRef = useRef(0)
+  const lastStoneTimeRef = useRef(0)
+  const pointerDownRef = useRef(false)
+  const pointerPosRef = useRef({ x: 0, y: 0 })
+  const stoneImageRef = useRef<HTMLImageElement | null>(null)
+  const animationFrameRef = useRef<number>(0)
+
+  const initializeCanvas = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const dpr = window.devicePixelRatio || 1
+    const rect = canvas.getBoundingClientRect()
+    canvas.width = rect.width * dpr
+    canvas.height = rect.height * dpr
+    canvas.style.width = `${rect.width}px`
+    canvas.style.height = `${rect.height}px`
+
+    const context = canvas.getContext('2d')
+    if (!context) return
+
+    context.scale(dpr, dpr)
+    contextRef.current = context
+    waterLevelRef.current = rect.height * 0.7
+  }, [])
+
+  const { stonesRef, ripplesRef, stoneCount, createStone, createRipple } = useWaveAnimation(
+    canvasRef.current?.width || 0,
+    canvasRef.current?.height || 0
+  )
+
+  useEffect(() => {
+    if (stoneImage) {
+      const img = new Image()
+      img.src = stoneImage
+      img.onload = () => {
+        stoneImageRef.current = img
+      }
+    }
+  }, [stoneImage])
+
+  useEffect(() => {
+    onStoneCountChange?.(stoneCount)
+  }, [stoneCount, onStoneCountChange])
+
+  useEffect(() => {
+    initializeCanvas()
+    const handleResize = () => {
+      initializeCanvas()
+    }
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      cancelAnimationFrame(animationFrameRef.current)
+    }
+  }, [initializeCanvas])
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (stoneCount >= maxStones) return
+
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return
+
+    pointerDownRef.current = true
+    pointerPosRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    }
+
+    const now = Date.now()
+    if (now - lastStoneTimeRef.current > WAVE_CONSTANTS.STONE_CREATION_INTERVAL) {
+      const size = WAVE_CONSTANTS.MIN_STONE_SIZE + Math.random() * (WAVE_CONSTANTS.MAX_STONE_SIZE - WAVE_CONSTANTS.MIN_STONE_SIZE)
+      const color = WAVE_COLORS.STONE_BORDER
+      createStone(pointerPosRef.current.x, pointerPosRef.current.y, size, color, stoneImageRef.current || undefined)
+      createRipple(pointerPosRef.current.x, pointerPosRef.current.y, size)
+      lastStoneTimeRef.current = now
+    }
+  }, [createStone, createRipple, stoneCount, maxStones])
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!pointerDownRef.current || stoneCount >= maxStones) return
+
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return
+
+    const currentPos = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    }
+
+    const now = Date.now()
+    if (now - lastStoneTimeRef.current > WAVE_CONSTANTS.STONE_CREATION_INTERVAL) {
+      const size = WAVE_CONSTANTS.MIN_STONE_SIZE + Math.random() * (WAVE_CONSTANTS.MAX_STONE_SIZE - WAVE_CONSTANTS.MIN_STONE_SIZE)
+      const color = WAVE_COLORS.STONE_BORDER
+      createStone(currentPos.x, currentPos.y, size, color, stoneImageRef.current || undefined)
+      createRipple(currentPos.x, currentPos.y, size)
+      lastStoneTimeRef.current = now
+    }
+
+    pointerPosRef.current = currentPos
+  }, [createStone, createRipple, stoneCount, maxStones])
+
+  const handlePointerUp = useCallback(() => {
+    pointerDownRef.current = false
+  }, [])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+      style={{ width: '100%', height: '100%', touchAction: 'none' }}
+    />
+  )
 }
 
 export default function WaveRectangle({
