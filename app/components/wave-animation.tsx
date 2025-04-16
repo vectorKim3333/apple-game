@@ -1,9 +1,9 @@
 "use client"
 
 import { useRef, useEffect, useCallback, useState } from "react"
-import { WAVE_CONSTANTS, WAVE_COLORS } from '../constants/wave-animation'
-import { useWaveAnimation } from '../hooks/useWaveAnimation'
-import { useCanvasInteraction } from '../hooks/useCanvasInteraction'
+import { WAVE_COLORS, WAVE_CONSTANTS } from '@/app/constants/wave-animation'
+import { useWaveAnimation } from '@/app/hooks/useWaveAnimation'
+import { useCanvasInteraction } from '@/app/hooks/useCanvasInteraction'
 
 interface WaveRectangleProps {
   width: number
