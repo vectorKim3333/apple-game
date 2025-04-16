@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function AppleGame() {
   return (
-    <div className="container mx-auto px-4">
+    <div className="game-page no-scroll h-full">
       <AppleNumberGame />
     </div>
   );
