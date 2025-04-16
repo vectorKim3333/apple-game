@@ -105,16 +105,6 @@ export default function AppleNumberGame() {
       random: 3,
       reset: 1,
     })
-
-    // BGM 시작 - 약간의 지연 후 실행
-    setTimeout(() => {
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0
-        if (bgmEnabled) {
-          tryPlayAudio()
-        }
-      }
-    }, 100)
   }
 
   // Handle keyboard shortcuts
