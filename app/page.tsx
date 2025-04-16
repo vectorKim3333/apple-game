@@ -17,6 +17,13 @@ const games: Game[] = [
     imageUrl: '/images/apple-game-thumbnail.png',
     path: '/apple-game'
   },
+  {
+    id: 'water-meditation',
+    title: '물멍',
+    description: '잔잔한 물결을 보며 마음의 안정을 찾아보세요.',
+    imageUrl: '/images/water-meditation-thumbnail.png',
+    path: '/water-meditation'
+  },
   // 추후 다른 게임들이 추가될 예정
 ];
 
