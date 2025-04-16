@@ -8,11 +8,11 @@ export default function PrivacyPolicy() {
       <section className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">1. 개인정보의 처리 목적</h2>
         <p className="mb-4">
-          본 웹사이트는 사용자의 게임 플레이 경험 개선과 서비스 제공을 위해 필요한 최소한의 개인정보를 수집하고 있습니다.
+          미니게임 천국은 이용자의 게임 플레이 경험 개선과 서비스 제공을 위해 필요한 최소한의 개인정보를 수집하고 있습니다.
           수집된 개인정보는 다음의 목적 이외의 용도로는 이용되지 않습니다:
         </p>
         <ul className="list-disc pl-6 mb-4">
-          <li>게임 서비스 제공 및 운영</li>
+          <li>다양한 미니게임 서비스 제공 및 운영</li>
           <li>서비스 이용 기록 분석을 통한 서비스 개선</li>
           <li>광고 서비스 제공 및 운영</li>
         </ul>
@@ -25,6 +25,7 @@ export default function PrivacyPolicy() {
           <li>자동 수집 항목: 접속 IP, 브라우저 종류, 접속 시간</li>
           <li>Google Analytics를 통해 수집되는 사용자 행동 데이터</li>
           <li>광고 서비스 제공을 위한 쿠키 정보</li>
+          <li>게임 플레이 기록 및 통계</li>
         </ul>
       </section>
 

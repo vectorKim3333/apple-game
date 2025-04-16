@@ -8,7 +8,7 @@ export default function Terms() {
       <section className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">제1조 (목적)</h2>
         <p className="mb-4">
-          이 약관은 사과 숫자 게임 웹사이트(이하 "서비스")의 이용조건 및 절차,
+          이 약관은 미니게임 천국 웹사이트(이하 "서비스")의 이용조건 및 절차,
           이용자와 당 사이트의 권리, 의무, 책임사항과 기타 필요한 사항을 규정함을 목적으로 합니다.
         </p>
       </section>
@@ -17,9 +17,9 @@ export default function Terms() {
         <h2 className="text-2xl font-semibold mb-4">제2조 (용어의 정의)</h2>
         <p className="mb-4">이 약관에서 사용하는 용어의 정의는 다음과 같습니다:</p>
         <ul className="list-disc pl-6 mb-4">
-          <li>"서비스"란 사과 숫자 게임을 온라인으로 제공하는 웹사이트를 의미합니다.</li>
+          <li>"서비스"란 다양한 미니게임을 온라인으로 제공하는 웹사이트를 의미합니다.</li>
           <li>"이용자"란 본 약관에 따라 서비스를 이용하는 모든 사용자를 말합니다.</li>
-          <li>"게임"이란 본 서비스에서 제공하는 사과 숫자 게임을 의미합니다.</li>
+          <li>"게임"이란 본 서비스에서 제공하는 모든 미니게임을 의미합니다.</li>
         </ul>
       </section>
 
@@ -40,8 +40,9 @@ export default function Terms() {
           1. 당 사이트는 다음과 같은 서비스를 제공합니다:
         </p>
         <ul className="list-disc pl-6 mb-4">
-          <li>사과 숫자 게임 서비스</li>
+          <li>다양한 미니게임 서비스</li>
           <li>게임 관련 부가 서비스</li>
+          <li>게임 플레이 기록 및 통계 서비스</li>
         </ul>
         <p className="mb-4">
           2. 당 사이트는 서비스의 제공에 필요한 경우 정기점검을 실시할 수 있으며,
@@ -88,6 +89,7 @@ export default function Terms() {
           <li>서비스의 안정적 운영을 방해하는 행위</li>
           <li>다른 이용자의 게임 이용을 방해하는 행위</li>
           <li>서비스를 이용하여 법령 또는 이 약관이 금지하거나 공서양속에 반하는 행위</li>
+          <li>게임 내 버그나 오류를 악용하는 행위</li>
           <li>기타 불법적이거나 부당한 행위</li>
         </ul>
       </section>
