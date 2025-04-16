@@ -18,26 +18,26 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className={`${inter.className} bg-white`}>
-        <main className="min-h-screen flex flex-col">
-          <header className="py-4 bg-white shadow-sm">
-            <div className="container mx-auto px-4">
-              <Link href="/" className="text-2xl font-bold hover:text-blue-600">
-                께에임즈
-              </Link>
-            </div>
-          </header>
+      <body className={`${inter.className} bg-white min-h-screen flex flex-col`}>
+        <header className="py-4 bg-white shadow-sm">
+          <div className="container mx-auto px-4">
+            <Link href="/" className="text-2xl font-bold hover:text-blue-600">
+              께에임즈
+            </Link>
+          </div>
+        </header>
+        <main className="flex-1">
           {children}
-          <footer className="mt-auto py-4 text-center text-sm text-gray-600">
-            <div className="space-x-4">
-              <Link href="/privacy" className="hover:text-gray-900">개인정보 처리방침</Link>
-              <Link href="/terms" className="hover:text-gray-900">이용약관</Link>
-            </div>
-            <div className="mt-2">
-              © 2024 께에임즈. All rights reserved.
-            </div>
-          </footer>
         </main>
+        <footer className="py-4 text-center text-sm text-gray-600 bg-white">
+          <div className="space-x-4">
+            <Link href="/privacy" className="hover:text-gray-900">개인정보 처리방침</Link>
+            <Link href="/terms" className="hover:text-gray-900">이용약관</Link>
+          </div>
+          <div className="mt-2">
+            © 2024 께에임즈. All rights reserved.
+          </div>
+        </footer>
         <Analytics />
       </body>
     </html>

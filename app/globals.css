@@ -12,6 +12,12 @@ body {
   background: rgb(var(--background-rgb));
 }
 
+/* 게임 페이지 스크롤 방지 */
+.game-page {
+  height: 100%;
+  overflow: hidden;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

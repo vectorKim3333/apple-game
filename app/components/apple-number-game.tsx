@@ -560,7 +560,7 @@ export default function AppleNumberGame() {
   // 시작 화면 렌더링 - 사과 아이콘 제거
   if (gameState === "start") {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
+      <div className="flex items-center justify-center min-h-[84vh] bg-white">
         <div className="relative w-full max-w-4xl p-6 rounded-3xl bg-green-500">
           {/* 배경 장식 요소 */}
           <div className="absolute inset-0 overflow-hidden rounded-3xl">
@@ -686,7 +686,7 @@ export default function AppleNumberGame() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-white">
+    <div className="flex items-center justify-center  min-h-[84vh] bg-white">
       <div className="relative w-full max-w-4xl p-6 rounded-3xl bg-green-500">
         <div className="flex">
           <div ref={gameAreaRef} className="relative bg-green-100 p-4 rounded-lg grid-bg select-none flex-1">
