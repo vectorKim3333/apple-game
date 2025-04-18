@@ -59,7 +59,7 @@ export default function GameStart({ onStartGame }: GameStartProps) {
                   게임 플레이
                 </h3>
                 <img 
-                  src="/images/tile-game-demo2.gif" 
+                  src="/images/tile-game-demo.gif" 
                   alt="타일 게임 플레이 방법" 
                   className="w-full rounded-lg shadow-md"
                   style={{ imageRendering: "pixelated" }}

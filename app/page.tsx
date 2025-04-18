@@ -28,7 +28,7 @@ const games: Game[] = [
     id: 'color-tiles',
     title: '타일 매칭',
     description: '같은 색상의 타일을 연결하여 점수를 얻는 게임입니다.',
-    imageUrl: '/images/color-tiles-thumbnail.png',
+    imageUrl: '/images/tile-game-demo.gif',
     path: '/color-tiles'
   }
 ];
