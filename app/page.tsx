@@ -12,7 +12,7 @@ interface Game {
 const games: Game[] = [
   {
     id: 'apple-game',
-    title: '사과 숫자 게임',
+    title: '사과 게임',
     description: '사과를 클릭하여 숫자를 맞추는 게임입니다.',
     imageUrl: '/images/apple-game-thumbnail.png',
     path: '/apple-game'
