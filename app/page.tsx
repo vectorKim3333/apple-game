@@ -24,7 +24,13 @@ const games: Game[] = [
     imageUrl: '/images/water-meditation-thumbnail.png',
     path: '/water-meditation'
   },
-  // 추후 다른 게임들이 추가될 예정
+  {
+    id: 'color-tiles',
+    title: '타일 매칭',
+    description: '같은 색상의 타일을 연결하여 점수를 얻는 게임입니다.',
+    imageUrl: '/images/color-tiles-thumbnail.png',
+    path: '/color-tiles'
+  }
 ];
 
 export default function Home() {
