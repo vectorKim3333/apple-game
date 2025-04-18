@@ -446,10 +446,6 @@ export default function TileGame() {
         text = "와일드 카드!"
         bgColor = "bg-yellow-500"
         break
-      case SpecialTileType.BOMB:
-        text = "폭탄!"
-        bgColor = "bg-red-500"
-        break
     }
 
     popupElement.className = `absolute text-sm font-bold text-white ${bgColor} rounded-full px-2 py-0.5 z-10` // 텍스트 크기 축소
