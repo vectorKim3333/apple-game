@@ -14,9 +14,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-
-// 타일 게임에서 게임 난이도 열거형 가져오기
 import { GameDifficulty } from "../types/game"
+import { SPECIAL_TILE_RATIOS } from "../constants/gameConstants"
 
 interface GameStartProps {
   onStartGame: (difficulty: GameDifficulty) => void
@@ -24,6 +23,7 @@ interface GameStartProps {
 
 export default function GameStart({ onStartGame }: GameStartProps) {
   const [selectedDifficulty, setSelectedDifficulty] = useState<GameDifficulty>(GameDifficulty.NORMAL)
+  const [activeTab, setActiveTab] = useState("how-to-play")
 
   // 난이도 이름 표시용 함수
   const getDifficultyName = (diff: GameDifficulty) => {
@@ -47,26 +47,39 @@ export default function GameStart({ onStartGame }: GameStartProps) {
         </div>
 
         <CardContent className="p-6">
-          <Tabs defaultValue="how-to-play" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid grid-cols-2 mb-4">
               <TabsTrigger value="how-to-play">게임 방법</TabsTrigger>
               <TabsTrigger value="special-tiles">특수 타일</TabsTrigger>
             </TabsList>
 
             <TabsContent value="how-to-play" className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-lg font-semibold flex items-center mb-2">
-                  게임 플레이
-                </h3>
-                <img 
-                  src="/images/tile-game-demo.gif" 
-                  alt="타일 게임 플레이 방법" 
-                  className="w-full rounded-lg shadow-md"
-                  style={{ imageRendering: "pixelated" }}
-                />
-              </div>
+              <img 
+                src="/images/tile-game-demo3.gif" 
+                alt="타일 게임 플레이 방법" 
+                className="rounded-lg shadow-md mx-auto"
+                style={{ imageRendering: "pixelated" }}
+              />
 
-              <Accordion type="single" defaultValue="difficulty" collapsible className="w-full">
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="rules">
+                  <AccordionTrigger className="text-lg font-semibold">게임 규칙</AccordionTrigger>
+                  <AccordionContent className="text-gray-700">
+                    <div className="space-y-3">
+                      <p>1. 같은 색상의 타일을 2개 이상 연결하여 매치를 만듭니다.</p>
+                      <p>2. 타일은 가로나 세로로 연결되어야 하며, 한 번의 90도 방향 전환이 가능합니다. (ㄱ자, ㄴ자 모양 가능)</p>
+                      <p>3. 매치가 완성되면 해당 타일들이 사라지고 점수를 획득합니다.</p>
+                      <p>4. <button 
+                              onClick={() => setActiveTab("special-tiles")}
+                              className="text-blue-600 hover:text-blue-800 underline"
+                          >특수 타일</button>을 활용하여 더 높은 점수를 획득하세요.</p>
+                      <p>5. 제한 시간 안에 최대한 많은 점수를 획득하는 것이 목표입니다.</p>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+
+              <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="difficulty">
                   <AccordionTrigger className="text-lg font-semibold">난이도 레벨</AccordionTrigger>
                   <AccordionContent className="text-gray-700">
@@ -153,27 +166,107 @@ export default function GameStart({ onStartGame }: GameStartProps) {
                 </Card>
               </div>
 
-              <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-lg font-semibold mb-2">특수 타일 분포</h3>
-                <h4 className="text-sm mb-2">[보통 기준]</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                  <div className="flex items-center">
-                    <Star className="h-4 w-4 mr-1 text-yellow-500" />
-                    <span className="text-gray-700">타일의 3%</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-1 text-blue-500" />
-                    <span className="text-gray-700">타일의 1.5%</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Award className="h-4 w-4 mr-1 text-purple-500" />
-                    <span className="text-gray-700">타일의 2.5%</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Zap className="h-4 w-4 mr-1 text-red-500" />
-                    <span className="text-gray-700">타일의 1%</span>
-                  </div>
-                </div>
+              <div className="mt-6">
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="tile-distribution">
+                    <AccordionTrigger className="text-lg font-semibold">특수 타일 분포</AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4">
+                        {/* 쉬움 난이도 */}
+                        <div className="bg-green-50 p-4 rounded-lg">
+                          <h4 className="font-semibold text-green-700 mb-2">쉬움</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                            <div className="flex items-center">
+                              <Star className="h-4 w-4 mr-1 text-yellow-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.easy.wild * 100}%</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Clock className="h-4 w-4 mr-1 text-blue-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.easy.time_bonus * 100}%</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Award className="h-4 w-4 mr-1 text-purple-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.easy.multiplier * 100}%</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Zap className="h-4 w-4 mr-1 text-red-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.easy.bomb * 100}%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 보통 난이도 */}
+                        <div className="bg-blue-50 p-4 rounded-lg">
+                          <h4 className="font-semibold text-blue-700 mb-2">보통</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                            <div className="flex items-center">
+                              <Star className="h-4 w-4 mr-1 text-yellow-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.normal.wild * 100}%</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Clock className="h-4 w-4 mr-1 text-blue-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.normal.time_bonus * 100}%</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Award className="h-4 w-4 mr-1 text-purple-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.normal.multiplier * 100}%</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Zap className="h-4 w-4 mr-1 text-red-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.normal.bomb * 100}%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 어려움 난이도 */}
+                        <div className="bg-orange-50 p-4 rounded-lg">
+                          <h4 className="font-semibold text-orange-700 mb-2">어려움</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                            <div className="flex items-center">
+                              <Star className="h-4 w-4 mr-1 text-yellow-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.hard.wild * 100}%</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Clock className="h-4 w-4 mr-1 text-blue-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.hard.time_bonus * 100}%</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Award className="h-4 w-4 mr-1 text-purple-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.hard.multiplier * 100}%</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Zap className="h-4 w-4 mr-1 text-red-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.hard.bomb * 100}%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 타임 어택 난이도 */}
+                        <div className="bg-purple-50 p-4 rounded-lg">
+                          <h4 className="font-semibold text-purple-700 mb-2">타임 어택</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                            <div className="flex items-center">
+                              <Star className="h-4 w-4 mr-1 text-yellow-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.time_attack.wild * 100}%</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Clock className="h-4 w-4 mr-1 text-blue-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.time_attack.time_bonus * 100}%</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Award className="h-4 w-4 mr-1 text-purple-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.time_attack.multiplier * 100}%</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Zap className="h-4 w-4 mr-1 text-red-500" />
+                              <span className="text-gray-700">타일의 {SPECIAL_TILE_RATIOS.time_attack.bomb * 100}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </div>
             </TabsContent>
           </Tabs>
