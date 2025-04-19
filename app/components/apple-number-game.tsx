@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Volume2, Plus, Minus, Shuffle, RefreshCw } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
@@ -60,7 +60,7 @@ export default function AppleNumberGame() {
   const gameActive = gameState === "playing"
 
   // Generate a grid of random numbers between 1-9
-  const generateGrid = () => {
+  const generateGrid = useCallback(() => {
     const apples: Apple[][] = []
     for (let i = 0; i < 10; i++) {
       const row: Apple[] = []
@@ -75,7 +75,7 @@ export default function AppleNumberGame() {
       apples.push(row)
     }
     return apples
-  }
+  }, [])
 
   const [apples, setApples] = useState<Apple[][]>(generateGrid())
 
@@ -94,7 +94,7 @@ export default function AppleNumberGame() {
   }, [])
 
   // 게임 시작 함수 수정
-  const startGame = () => {
+  const startGame = useCallback(() => {
     setGameState("playing")
     setTimeLeft(120)
     setScore(0)
@@ -105,7 +105,7 @@ export default function AppleNumberGame() {
       random: 3,
       reset: 1,
     })
-  }
+  }, [generateGrid])
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -150,7 +150,7 @@ export default function AppleNumberGame() {
   }, [gameActive, apples, toolUsage, activeTool]) // activeTool을 의존성 배열에 추가
 
   // 모든 남아있는 사과 랜덤 변경
-  const randomizeAllApples = () => {
+  const randomizeAllApples = useCallback(() => {
     if (!gameActive || toolUsage.reset <= 0) return
 
     setApples((prevApples) =>
@@ -170,10 +170,67 @@ export default function AppleNumberGame() {
       ...prev,
       reset: prev.reset - 1,
     }))
-  }
+  }, [gameActive, toolUsage.reset])
+
+  // Update which apples are selected based on the selection box
+  const updateSelectedApples = useCallback((selBox: { x: number; y: number; width: number; height: number }) => {
+    const grid = gridRef.current
+    if (!grid) return
+    const rect = grid.getBoundingClientRect()
+    const cellWidth = rect.width / 17
+    const cellHeight = rect.height / 10
+    const newApples = apples.map((row, rowIndex) =>
+      row.map((apple, colIndex) => {
+        if (apple.removed) return apple
+        const appleX = colIndex * cellWidth + cellWidth / 2
+        const appleY = rowIndex * cellHeight + cellHeight / 2
+        const buffer = Math.min(cellWidth, cellHeight) * 0.3
+        const isSelected =
+          appleX + buffer >= selBox.x &&
+          appleX - buffer <= selBox.x + selBox.width &&
+          appleY + buffer >= selBox.y &&
+          appleY - buffer <= selBox.y + selBox.height
+        return { ...apple, selected: isSelected }
+      }),
+    )
+    setApples(newApples)
+    let sum = 0
+    let count = 0
+    newApples.forEach((row) => {
+      row.forEach((apple) => {
+        if (apple.selected && !apple.removed) {
+          sum += apple.value
+          count++
+        }
+      })
+    })
+    setSelectedSum(sum)
+    setSelectedCount(count)
+    setIsValidSelection(sum === 10)
+  }, [apples])
+
+  // Handle mouse move to update selection box
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging || !gameActive || activeTool) return
+    const grid = gridRef.current
+    if (!grid) return
+    const rect = grid.getBoundingClientRect()
+    const currentX = e.clientX - rect.left
+    const currentY = e.clientY - rect.top
+    const width = currentX - startPoint.x
+    const height = currentY - startPoint.y
+    const selBox = {
+      x: width > 0 ? startPoint.x : currentX,
+      y: height > 0 ? startPoint.y : currentY,
+      width: Math.abs(width),
+      height: Math.abs(height),
+    }
+    setSelectionBox(selBox)
+    updateSelectedApples(selBox)
+  }, [isDragging, gameActive, activeTool, startPoint, updateSelectedApples])
 
   // 특정 사과 클릭 처리
-  const handleAppleClick = (rowIndex: number, colIndex: number) => {
+  const handleAppleClick = useCallback((rowIndex: number, colIndex: number) => {
     if (!gameActive || !activeTool || apples[rowIndex][colIndex].removed) return
 
     const apple = apples[rowIndex][colIndex]
@@ -223,10 +280,10 @@ export default function AppleNumberGame() {
       // 도구 비활성화
       setActiveTool(null)
     }
-  }
+  }, [gameActive, activeTool, apples, toolUsage])
 
   // 도구 활성화 처리 (토글 기능 포함)
-  const handleToolActivation = (tool: ToolType) => {
+  const handleToolActivation = useCallback((tool: ToolType) => {
     if (!gameActive) return
 
     // 사용 가능 횟수 확인
@@ -234,7 +291,7 @@ export default function AppleNumberGame() {
 
     // 토글 기능: 이미 활성화된 경우 비활성화, 아닌 경우 활성화
     setActiveTool(activeTool === tool ? null : tool)
-  }
+  }, [gameActive, toolUsage, activeTool])
 
   // BGM 재생 함수 개선
   const tryPlayAudio = () => {
@@ -324,7 +381,7 @@ export default function AppleNumberGame() {
   }, [gameActive, timeLeft, resetKey]) // Add resetKey to dependencies
 
   // Reset the game
-  const resetGame = () => {
+  const resetGame = useCallback(() => {
     // Clear any existing timer
     if (timerRef.current) {
       clearInterval(timerRef.current)
@@ -356,10 +413,10 @@ export default function AppleNumberGame() {
       audioRef.current.currentTime = 0
       tryPlayAudio()
     }
-  }
+  }, [generateGrid, tryPlayAudio])
 
   // Handle mouse down to start dragging
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!gameActive) return
 
     // 활성화된 도구가 있으면 드래그 시작하지 않음
@@ -378,87 +435,10 @@ export default function AppleNumberGame() {
 
     // Try to play audio on user interaction
     tryPlayAudio()
-  }
-
-  // Handle mouse move to update selection box
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !gameActive || activeTool) return
-
-    const grid = gridRef.current
-    if (!grid) return
-
-    const rect = grid.getBoundingClientRect()
-    const currentX = e.clientX - rect.left
-    const currentY = e.clientY - rect.top
-
-    const width = currentX - startPoint.x
-    const height = currentY - startPoint.y
-
-    // Calculate the selection box coordinates
-    const selBox = {
-      x: width > 0 ? startPoint.x : currentX,
-      y: height > 0 ? startPoint.y : currentY,
-      width: Math.abs(width),
-      height: Math.abs(height),
-    }
-
-    setSelectionBox(selBox)
-
-    // Update selected apples
-    updateSelectedApples(selBox)
-  }
-
-  // Update which apples are selected based on the selection box
-  const updateSelectedApples = (selBox: { x: number; y: number; width: number; height: number }) => {
-    const grid = gridRef.current
-    if (!grid) return
-
-    const rect = grid.getBoundingClientRect()
-    const cellWidth = rect.width / 17
-    const cellHeight = rect.height / 10
-
-    // Calculate which cells are within the selection box
-    const newApples = apples.map((row, rowIndex) =>
-      row.map((apple, colIndex) => {
-        if (apple.removed) return apple
-
-        const appleX = colIndex * cellWidth + cellWidth / 2
-        const appleY = rowIndex * cellHeight + cellHeight / 2
-
-        // Add a buffer around each apple to make selection more generous
-        const buffer = Math.min(cellWidth, cellHeight) * 0.3
-
-        const isSelected =
-          appleX + buffer >= selBox.x &&
-          appleX - buffer <= selBox.x + selBox.width &&
-          appleY + buffer >= selBox.y &&
-          appleY - buffer <= selBox.y + selBox.height
-
-        return { ...apple, selected: isSelected }
-      }),
-    )
-
-    setApples(newApples)
-
-    // Calculate sum of selected apples and count
-    let sum = 0
-    let count = 0
-    newApples.forEach((row) => {
-      row.forEach((apple) => {
-        if (apple.selected && !apple.removed) {
-          sum += apple.value
-          count++
-        }
-      })
-    })
-
-    setSelectedSum(sum)
-    setSelectedCount(count)
-    setIsValidSelection(sum === 10)
-  }
+  }, [gameActive, activeTool, tryPlayAudio])
 
   // Handle mouse up to end dragging and process selection
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     if (!isDragging || !gameActive) return
 
     setIsDragging(false)
@@ -487,7 +467,7 @@ export default function AppleNumberGame() {
     setSelectedSum(0)
     setSelectedCount(0)
     setIsValidSelection(false)
-  }
+  }, [isDragging, gameActive, isValidSelection, selectedCount, apples, score])
 
   // Toggle BGM
   const handleBgmToggle = (checked: boolean | "indeterminate") => {
@@ -545,7 +525,7 @@ export default function AppleNumberGame() {
   }
 
   // Calculate progress percentage for the timer bar
-  const progressPercentage = (timeLeft / 120) * 100
+  const progressPercentage = useMemo(() => (timeLeft / 120) * 100, [timeLeft])
 
   // 시작 화면 렌더링 - 사과 아이콘 제거
   if (gameState === "start") {
