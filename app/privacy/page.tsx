@@ -70,8 +70,8 @@ export default function PrivacyPolicy() {
       <section className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">6. 개인정보 보호책임자</h2>
         <p className="mb-4">
-          개인정보 보호책임자: 김벡터<br />
-          이메일: vectorkim3333@gmail.com
+          개인정보 보호책임자: 김성현<br />
+          이메일: opei71@naver.com
         </p>
       </section>
 
