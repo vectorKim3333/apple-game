@@ -76,6 +76,28 @@ export default function TileGame() {
     boardRef,
   })
 
+  // BGM(효과음) on/off 상태 및 로컬스토리지 연동
+  const getInitialBgmEnabled = () => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('tilegame_bgmEnabled')
+      return stored === null ? true : stored === 'true'
+    }
+    return true
+  }
+  const [bgmEnabled, setBgmEnabled] = useState(getInitialBgmEnabled)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tilegame_bgmEnabled', String(bgmEnabled))
+    }
+  }, [bgmEnabled])
+
+  // 사운드 효과 오디오 ref 선언
+  const successAudioRef = useRef<HTMLAudioElement>(null)
+  const penaltyAudioRef = useRef<HTMLAudioElement>(null)
+  const boomAudioRef = useRef<HTMLAudioElement>(null)
+  const multiplierAudioRef = useRef<HTMLAudioElement>(null)
+  const timeBonusAudioRef = useRef<HTMLAudioElement>(null)
+
   // 값이 변경될 때 refs 업데이트
   useEffect(() => {
     scoreRef.current = score
@@ -768,6 +790,12 @@ export default function TileGame() {
         // 시간 패널티 애니메이션 생성
         createTimePenaltyAnimation(x, y)
 
+        // 패널티 사운드 재생
+        if (bgmEnabled && penaltyAudioRef.current) {
+          penaltyAudioRef.current.currentTime = 0
+          penaltyAudioRef.current.play()
+        }
+
         setTimeout(() => {
           setPenaltyAnimation(false)
         }, 250)
@@ -805,6 +833,12 @@ export default function TileGame() {
         if (tilesToRemove.some((t) => t.id === tile.id)) {
           const bombTiles = applyBombEffect(tile.x, tile.y)
 
+          // 폭탄 사운드 재생
+          if (bgmEnabled && boomAudioRef.current) {
+            boomAudioRef.current.currentTime = 0
+            boomAudioRef.current.play()
+          }
+
           // 폭탄으로 제거된 타일 수 추적
           bombRemovedTilesCount += bombTiles.length
 
@@ -833,6 +867,12 @@ export default function TileGame() {
       // 필요한 경우 시간 보너스 적용
       if (hasTimeBonus) {
         setTimeLeft((prev) => Math.min(INITIAL_TIME, prev + TIME_BONUS))
+
+        // 타임보너스 사운드 재생
+        if (bgmEnabled && timeBonusAudioRef.current) {
+          timeBonusAudioRef.current.currentTime = 0
+          timeBonusAudioRef.current.play()
+        }
 
         // 제거되는 각 시간 보너스 타일에 대해 시간 보너스 효과 표시
         for (const { tile } of specialTiles.timeBonus) {
@@ -891,6 +931,12 @@ export default function TileGame() {
 
       // 필요한 경우 멀티플라이어 효과 표시
       if (hasMultiplier) {
+        // 멀티플라이어 사운드 재생
+        if (bgmEnabled && multiplierAudioRef.current) {
+          multiplierAudioRef.current.currentTime = 0
+          multiplierAudioRef.current.play()
+        }
+
         // 제거되는 각 멀티플라이어 타일에 대해 멀티플라이어 효과 표시
         for (const { tile } of specialTiles.multiplier) {
           if (tilesToRemove.some((t) => t.id === tile.id)) {
@@ -934,6 +980,12 @@ export default function TileGame() {
       // 점수 계산 부분을 수정하여 폭탄으로 제거된 타일에 대한 점수 추가
       // 기존 매치 점수 + 폭탄 효과 점수
       const pointsToAdd = (matches.length + bombRemovedTilesCount) * (hasMultiplier ? 2 : 1)
+
+      // 지우기 성공 사운드 재생
+      if (bgmEnabled && successAudioRef.current) {
+        successAudioRef.current.currentTime = 0
+        successAudioRef.current.play()
+      }
 
       // 점수 팝업 생성
       const basePoints = matches.length
@@ -1007,6 +1059,7 @@ export default function TileGame() {
       drawPathSegments,
       createPathToTile,
       specialTileCounts,
+      bgmEnabled,
     ],
   )
 
@@ -1220,6 +1273,16 @@ export default function TileGame() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* BGM(효과음) 체크박스 */}
+          <label className="flex items-center gap-1 mr-2 select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={bgmEnabled}
+              onChange={e => setBgmEnabled(e.target.checked)}
+              className="accent-red-500 w-4 h-4"
+            />
+            <span className="text-sm text-gray-700">효과음</span>
+          </label>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="flex items-center gap-1">
@@ -1248,6 +1311,11 @@ export default function TileGame() {
           </Button>
         </div>
       </div>
+      <audio ref={successAudioRef} src="/sounds/success.mp3" preload="auto" />
+      <audio ref={penaltyAudioRef} src="/sounds/penalty.mp3" preload="auto" />
+      <audio ref={boomAudioRef} src="/sounds/boom.mp3" preload="auto" />
+      <audio ref={multiplierAudioRef} src="/sounds/multiplier.mp3" preload="auto" />
+      <audio ref={timeBonusAudioRef} src="/sounds/time-bonus.mp3" preload="auto" />
     </div>
   )
 }
