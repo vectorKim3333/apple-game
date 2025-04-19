@@ -13,53 +13,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import GameStart from "./tile-game-start"
+import { BOARD_DIMENSIONS, COLORS, TIME_CONSTANTS, SPECIAL_TILE_RATIOS } from "../constants/gameConstants"
+import { GameDifficulty, SpecialTileType, Tile, PathSegment } from "../types/game"
+import { useSpecialTiles } from "../hooks/useSpecialTiles"
 
-// 타일 색상 정의
-const COLORS = [
-  "bg-red-400",
-  "bg-blue-500",
-  "bg-green-500",
-  "bg-purple-400",
-  "bg-orange-400",
-  "bg-teal-400",
-  "bg-yellow-400",
-  "bg-gray-400",
-]
+// 게임 보드 크기와 시간 상수
+const { ROWS: BOARD_ROWS, COLS: BOARD_COLS } = BOARD_DIMENSIONS
+const { INITIAL: INITIAL_TIME, PENALTY: TIME_PENALTY, BONUS: TIME_BONUS } = TIME_CONSTANTS
 
-// 특수 타일 유형 정의
-enum SpecialTileType {
-  NONE = "none",
-  WILD = "wild", // 어떤 색상과도 매치 가능
-  TIME_BONUS = "time", // 시계에 시간 추가
-  MULTIPLIER = "multiplier", // 매치 점수 두 배
-  BOMB = "bomb", // 인접한 타일 제거
-}
-
-// 게임 난이도 모드 정의
-export enum GameDifficulty {
-  EASY = "easy",
-  NORMAL = "normal",
-  HARD = "hard",
-  TIME_ATTACK = "time_attack",
-}
-
-// 타일 인터페이스 정의
-interface Tile {
-  id: number
-  color: string
-  x: number
-  y: number
-  special: SpecialTileType
-}
-
-// 경로 세그먼트 인터페이스 정의
-interface PathSegment {
-  startX: number
-  startY: number
-  endX: number
-  endY: number
-  isHorizontal: boolean
-}
+type SpecialTileCounts = Record<SpecialTileType, number>
 
 // 특수 타일 비율 구성 인터페이스 정의
 interface SpecialTileRatios {
@@ -67,53 +29,26 @@ interface SpecialTileRatios {
   [SpecialTileType.TIME_BONUS]: number
   [SpecialTileType.MULTIPLIER]: number
   [SpecialTileType.BOMB]: number
+  [SpecialTileType.NONE]: number
   fillRate: number
 }
 
-// 게임 보드 크기 - 23열 x 15행
-const BOARD_COLS = 23
-const BOARD_ROWS = 15
-const INITIAL_TIME = 120
-const TIME_PENALTY = 10
-const TIME_BONUS = 15
-
-// 다양한 게임 모드에 대한 특수 타일 비율 정의
-const SPECIAL_TILE_RATIOS: Record<GameDifficulty, SpecialTileRatios> = {
-  [GameDifficulty.EASY]: {
-    [SpecialTileType.WILD]: 0.04, // 4%
-    [SpecialTileType.TIME_BONUS]: 0.03, // 3%
-    [SpecialTileType.MULTIPLIER]: 0.03, // 3%
-    [SpecialTileType.BOMB]: 0.02, // 2%
-    fillRate: 0.55, // 보드의 55%가 타일로 채워짐
-  },
-  [GameDifficulty.NORMAL]: {
-    [SpecialTileType.WILD]: 0.03, // 3%
-    [SpecialTileType.TIME_BONUS]: 0.015, // 1.5%
-    [SpecialTileType.MULTIPLIER]: 0.025, // 2.5%
-    [SpecialTileType.BOMB]: 0.01, // 1%
-    fillRate: 0.6, // 보드의 60%가 타일로 채워짐
-  },
-  [GameDifficulty.HARD]: {
-    [SpecialTileType.WILD]: 0.015, // 1.5%
-    [SpecialTileType.TIME_BONUS]: 0.01, // 1%
-    [SpecialTileType.MULTIPLIER]: 0.02, // 2%
-    [SpecialTileType.BOMB]: 0.005, // 0.5%
-    fillRate: 0.65, // 보드의 65%가 타일로 채워짐
-  },
-  [GameDifficulty.TIME_ATTACK]: {
-    [SpecialTileType.WILD]: 0.025, // 2.5%
-    [SpecialTileType.TIME_BONUS]: 0.005, // 0.5%
-    [SpecialTileType.MULTIPLIER]: 0.04, // 4%
-    [SpecialTileType.BOMB]: 0.015, // 1.5%
-    fillRate: 0.6, // 보드의 60%가 타일로 채워짐
-  },
+// 특수 타일 생성 확률 계산
+const calculateSpecialTileChance = (ratios: Record<SpecialTileType, number>) => {
+  return (
+    ratios[SpecialTileType.WILD] +
+    ratios[SpecialTileType.TIME_BONUS] +
+    ratios[SpecialTileType.MULTIPLIER] +
+    ratios[SpecialTileType.BOMB] +
+    ratios[SpecialTileType.NONE]
+  )
 }
 
 export default function TileGame() {
   const [showStartScreen, setShowStartScreen] = useState(true)
   const [board, setBoard] = useState<(Tile | null)[][]>([])
   const [score, setScore] = useState(0)
-  const [timeLeft, setTimeLeft] = useState(INITIAL_TIME)
+  const [timeLeft, setTimeLeft] = useState<number>(INITIAL_TIME)
   const [gameActive, setGameActive] = useState(false)
   const [removingTiles, setRemovingTiles] = useState<{ id: number; x: number; y: number }[]>([])
   const [scoreAnimation, setScoreAnimation] = useState(false)
@@ -123,7 +58,7 @@ export default function TileGame() {
   const [difficulty, setDifficulty] = useState<GameDifficulty>(GameDifficulty.NORMAL)
 
   // 특수 타일 수 추적
-  const [specialTileCounts, setSpecialTileCounts] = useState<Record<SpecialTileType, number>>({
+  const [specialTileCounts, setSpecialTileCounts] = useState<SpecialTileCounts>({
     [SpecialTileType.WILD]: 0,
     [SpecialTileType.TIME_BONUS]: 0,
     [SpecialTileType.MULTIPLIER]: 0,
@@ -131,10 +66,15 @@ export default function TileGame() {
     [SpecialTileType.NONE]: 0,
   })
 
-  const boardRef = useRef<HTMLDivElement>(null)
+  const boardRef = useRef<HTMLDivElement>(null!)
   const timerRef = useRef<HTMLDivElement>(null)
   const scoreRef = useRef(score)
   const timeLeftRef = useRef(timeLeft)
+
+  const { createEffectPopup: createSpecialEffectPopup, calculateMaxSpecialTiles, countSpecialTiles } = useSpecialTiles({
+    difficulty,
+    boardRef,
+  })
 
   // 값이 변경될 때 refs 업데이트
   useEffect(() => {
@@ -144,42 +84,6 @@ export default function TileGame() {
   useEffect(() => {
     timeLeftRef.current = timeLeft
   }, [timeLeft])
-
-  // 현재 난이도와 총 타일 수에 따라 허용되는 최대 특수 타일 계산
-  const calculateMaxSpecialTiles = useCallback(
-    (totalTiles: number) => {
-      const ratios = SPECIAL_TILE_RATIOS[difficulty]
-      return {
-        [SpecialTileType.WILD]: Math.floor(totalTiles * ratios[SpecialTileType.WILD]),
-        [SpecialTileType.TIME_BONUS]: Math.floor(totalTiles * ratios[SpecialTileType.TIME_BONUS]),
-        [SpecialTileType.MULTIPLIER]: Math.floor(totalTiles * ratios[SpecialTileType.MULTIPLIER]),
-        [SpecialTileType.BOMB]: Math.floor(totalTiles * ratios[SpecialTileType.BOMB]),
-      }
-    },
-    [difficulty],
-  )
-
-  // 보드에서 특수 타일 개수 세기
-  const countSpecialTiles = useCallback((newBoard: (Tile | null)[][]) => {
-    const counts: Record<SpecialTileType, number> = {
-      [SpecialTileType.WILD]: 0,
-      [SpecialTileType.TIME_BONUS]: 0,
-      [SpecialTileType.MULTIPLIER]: 0,
-      [SpecialTileType.BOMB]: 0,
-      [SpecialTileType.NONE]: 0
-    }
-
-    for (let y = 0; y < BOARD_ROWS; y++) {
-      for (let x = 0; x < BOARD_COLS; x++) {
-        const tile = newBoard[y][x]
-        if (tile && tile.special !== SpecialTileType.NONE) {
-          counts[tile.special]++
-        }
-      }
-    }
-
-    return counts
-  }, [])
 
   // 게임 보드 초기화
   const initializeBoard = useCallback(() => {
@@ -197,22 +101,14 @@ export default function TileGame() {
     }
 
     // 현재 난이도의 채움 비율에 따라 보드 채우기
-    const fillRate = SPECIAL_TILE_RATIOS[difficulty].fillRate
+    const difficultyConfig = SPECIAL_TILE_RATIOS[difficulty.toLowerCase() as keyof typeof SPECIAL_TILE_RATIOS]
+    const fillRate = difficultyConfig.fillRate
     const tilesToPlace = Math.floor(BOARD_ROWS * BOARD_COLS * fillRate)
     let tilesPlaced = 0
     let idCounter = 1
 
     // 배치할 총 타일 수에 따라 최대 특수 타일 계산
-    const maxSpecialTiles = {
-      [SpecialTileType.WILD]: Math.floor(tilesToPlace * SPECIAL_TILE_RATIOS[difficulty][SpecialTileType.WILD]),
-      [SpecialTileType.TIME_BONUS]: Math.floor(
-        tilesToPlace * SPECIAL_TILE_RATIOS[difficulty][SpecialTileType.TIME_BONUS],
-      ),
-      [SpecialTileType.MULTIPLIER]: Math.floor(
-        tilesToPlace * SPECIAL_TILE_RATIOS[difficulty][SpecialTileType.MULTIPLIER],
-      ),
-      [SpecialTileType.BOMB]: Math.floor(tilesToPlace * SPECIAL_TILE_RATIOS[difficulty][SpecialTileType.BOMB]),
-    }
+    const maxSpecialTiles = calculateMaxSpecialTiles(tilesToPlace)
 
     while (tilesPlaced < tilesToPlace) {
       const x = Math.floor(Math.random() * BOARD_COLS)
@@ -224,40 +120,46 @@ export default function TileGame() {
         // 이것이 특수 타일이어야 하는지 결정
         let special = SpecialTileType.NONE
 
-        // 총 특수 확률 계산
-        const ratios = SPECIAL_TILE_RATIOS[difficulty]
-        const totalSpecialProbability =
-          ratios[SpecialTileType.WILD] +
-          ratios[SpecialTileType.TIME_BONUS] +
-          ratios[SpecialTileType.MULTIPLIER] +
-          ratios[SpecialTileType.BOMB]
-
         // 특수 타일을 생성할 무작위 확률
+        const totalSpecialProbability = difficultyConfig.wild + difficultyConfig.time_bonus + 
+                                      difficultyConfig.multiplier + difficultyConfig.bomb
+        
         if (Math.random() <= totalSpecialProbability) {
           // 적격 특수 유형(최대 개수 미만인 것) 배열 생성
-          const eligibleTypes: SpecialTileType[] = []
+          const eligibleTypes: { type: SpecialTileType; probability: number }[] = []
 
           if (newSpecialTileCounts[SpecialTileType.WILD] < maxSpecialTiles[SpecialTileType.WILD]) {
-            eligibleTypes.push(SpecialTileType.WILD)
+            eligibleTypes.push({ type: SpecialTileType.WILD, probability: difficultyConfig.wild })
           }
 
           if (newSpecialTileCounts[SpecialTileType.TIME_BONUS] < maxSpecialTiles[SpecialTileType.TIME_BONUS]) {
-            eligibleTypes.push(SpecialTileType.TIME_BONUS)
+            eligibleTypes.push({ type: SpecialTileType.TIME_BONUS, probability: difficultyConfig.time_bonus })
           }
 
           if (newSpecialTileCounts[SpecialTileType.MULTIPLIER] < maxSpecialTiles[SpecialTileType.MULTIPLIER]) {
-            eligibleTypes.push(SpecialTileType.MULTIPLIER)
+            eligibleTypes.push({ type: SpecialTileType.MULTIPLIER, probability: difficultyConfig.multiplier })
           }
 
           if (newSpecialTileCounts[SpecialTileType.BOMB] < maxSpecialTiles[SpecialTileType.BOMB]) {
-            eligibleTypes.push(SpecialTileType.BOMB)
+            eligibleTypes.push({ type: SpecialTileType.BOMB, probability: difficultyConfig.bomb })
           }
 
-          // 적격 유형이 있으면 무작위로 하나 선택
+          // 적격 유형이 있으면 확률에 따라 선택
           if (eligibleTypes.length > 0) {
-            const randomIndex = Math.floor(Math.random() * eligibleTypes.length)
-            special = eligibleTypes[randomIndex]
-            newSpecialTileCounts[special]++
+            const totalProb = eligibleTypes.reduce((sum, { probability }) => sum + probability, 0)
+            let rand = Math.random() * totalProb
+            
+            for (const { type, probability } of eligibleTypes) {
+              rand -= probability
+              if (rand <= 0) {
+                special = type
+                break
+              }
+            }
+            
+            if (special !== SpecialTileType.NONE) {
+              newSpecialTileCounts[special]++
+            }
           }
         }
 
@@ -274,7 +176,7 @@ export default function TileGame() {
 
     // 여기서 상태를 업데이트하지 않고 새 보드와 개수를 반환
     return { board: newBoard, specialTileCounts: newSpecialTileCounts }
-  }, [difficulty])
+  }, [difficulty, calculateMaxSpecialTiles])
 
   // 게임 난이도에 따른 초기 시간 계산
   const getInitialTimeForDifficulty = useCallback((gameDifficulty: GameDifficulty) => {
@@ -352,8 +254,8 @@ export default function TileGame() {
 
     const rippleElement = document.createElement("div")
     rippleElement.className = "absolute rounded-full bg-white/30 animate-ripple"
-    rippleElement.style.width = "5px" // 원래 크기의 50%로 축소
-    rippleElement.style.height = "5px" // 원래 크기의 50%로 축소
+    rippleElement.style.width = "5px"
+    rippleElement.style.height = "5px"
     rippleElement.style.left = `${x * cellWidth + cellWidth / 2}px`
     rippleElement.style.top = `${y * cellHeight + cellHeight / 2}px`
 
@@ -516,7 +418,7 @@ export default function TileGame() {
           { width: `${cellWidth * 3}px`, height: `${cellHeight * 3}px`, opacity: 0 },
         ],
         {
-          duration: 500,
+          duration: 250,
           easing: "ease-out",
           fill: "forwards",
         },
@@ -526,7 +428,7 @@ export default function TileGame() {
         if (boardRef.current && boardRef.current.contains(explosionElement)) {
           boardRef.current.removeChild(explosionElement)
         }
-      }, 500)
+      }, 250)
 
       // 인접한 타일 확인
       directions.forEach(({ dx, dy }) => {
@@ -685,7 +587,7 @@ export default function TileGame() {
           if (boardRef.current && boardRef.current.contains(line)) {
             boardRef.current.removeChild(line)
           }
-        }, 700)
+        }, 350)
       }, index * 100) // 애니메이션 시차 두기
     })
   }, [])
@@ -725,7 +627,7 @@ export default function TileGame() {
           { transform: "translate(-50%, -150%) scale(0.8)", opacity: 0 },
         ],
         {
-          duration: 1000,
+          duration: 500,
           easing: "ease-out",
           fill: "forwards",
         },
@@ -737,7 +639,7 @@ export default function TileGame() {
         if (boardRef.current && boardRef.current.contains(popupElement)) {
           boardRef.current.removeChild(popupElement)
         }
-      }, 1000)
+      }, 500)
     },
     [],
   )
@@ -868,7 +770,7 @@ export default function TileGame() {
 
         setTimeout(() => {
           setPenaltyAnimation(false)
-        }, 500)
+        }, 250)
 
         return
       }
@@ -921,7 +823,7 @@ export default function TileGame() {
                 (effect) => !(effect.type === SpecialTileType.BOMB && effect.x === tile.x && effect.y === tile.y),
               ),
             )
-          }, 1000)
+          }, 500)
         }
       }
 
@@ -948,7 +850,7 @@ export default function TileGame() {
                     !(effect.type === SpecialTileType.TIME_BONUS && effect.x === tile.x && effect.y === tile.y),
                 ),
               )
-            }, 1000)
+            }, 500)
           }
         }
       }
@@ -1005,7 +907,7 @@ export default function TileGame() {
                     !(effect.type === SpecialTileType.MULTIPLIER && effect.x === tile.x && effect.y === tile.y),
                 ),
               )
-            }, 1000)
+            }, 500)
           }
         }
       }
@@ -1025,7 +927,7 @@ export default function TileGame() {
                 (effect) => !(effect.type === SpecialTileType.WILD && effect.x === tile.x && effect.y === tile.y),
               ),
             )
-          }, 1000)
+          }, 500)
         }
       }
 
@@ -1046,7 +948,7 @@ export default function TileGame() {
       setScoreAnimation(true)
       setTimeout(() => {
         setScoreAnimation(false)
-      }, 500)
+      }, 250)
 
       // 애니메이션 후 매치된 타일 제거 및 점수 업데이트
       setTimeout(() => {
@@ -1092,7 +994,7 @@ export default function TileGame() {
         setRemovingTiles((currentRemoving) =>
           currentRemoving.filter((tile) => !tilesToRemove.some((removeTile) => removeTile.id === tile.id)),
         )
-      }, 640)
+      }, 320)
     },
     [
       board,

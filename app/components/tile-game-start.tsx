@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 // 타일 게임에서 게임 난이도 열거형 가져오기
-import { GameDifficulty } from "./tile-game"
+import { GameDifficulty } from "../types/game"
 
 interface GameStartProps {
   onStartGame: (difficulty: GameDifficulty) => void
@@ -85,7 +85,7 @@ export default function GameStart({ onStartGame }: GameStartProps) {
                       </div>
                       <div className="bg-purple-50 p-3 rounded-md">
                         <h4 className="font-semibold text-purple-700">타임 어택</h4>
-                        <p className="text-sm">더 많은 멀티플라이어, 단 60초, 속도에 집중</p>
+                        <p className="text-sm">더 많은 2배 점수, 단 60초, 속도에 집중</p>
                       </div>
                     </div>
                   </AccordionContent>
@@ -128,7 +128,7 @@ export default function GameStart({ onStartGame }: GameStartProps) {
                   <CardHeader className="bg-purple-50 p-4">
                     <CardTitle className="text-lg flex items-center">
                       <Award className="h-5 w-5 mr-2 text-purple-500" />
-                      멀티플라이어
+                      2배 점수
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4">
@@ -155,6 +155,7 @@ export default function GameStart({ onStartGame }: GameStartProps) {
 
               <div className="mt-6 bg-gray-50 p-4 rounded-lg">
                 <h3 className="text-lg font-semibold mb-2">특수 타일 분포</h3>
+                <h4 className="text-sm mb-2">[보통 기준]</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                   <div className="flex items-center">
                     <Star className="h-4 w-4 mr-1 text-yellow-500" />
