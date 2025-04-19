@@ -571,7 +571,7 @@ export default function AppleNumberGame() {
   if (gameState === "start") {
     return (
       <div className="flex items-center justify-center min-h-[84vh] bg-white">
-        <div className="relative w-full max-w-4xl p-6 rounded-3xl bg-green-500">
+        <div className="relative w-full max-w-4xl p-4 rounded-3xl bg-green-500">
           {/* 배경 장식 요소 */}
           <div className="absolute inset-0 overflow-hidden rounded-3xl">
             {/* 상단 장식 사과들 */}
@@ -697,7 +697,7 @@ export default function AppleNumberGame() {
 
   return (
     <div className="flex items-center justify-center  min-h-[84vh] bg-white">
-      <div className="relative w-full max-w-4xl p-6 rounded-3xl bg-green-500">
+      <div className="relative w-full max-w-4xl p-4 rounded-3xl bg-green-500">
         <div className="flex">
           <div ref={gameAreaRef} className="relative bg-green-100 p-4 rounded-lg grid-bg select-none flex-1">
             {/* 도구 아이콘 */}
