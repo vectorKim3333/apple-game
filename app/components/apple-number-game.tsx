@@ -28,10 +28,33 @@ interface ToolUsage {
 type GameState = "start" | "playing" | "gameover"
 
 export default function AppleNumberGame() {
+  // 로컬스토리지에서 초기값 불러오기
+  const getInitialEyeComfortMode = () => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('applegame_eyeComfortMode')
+      return stored === null ? false : stored === 'true'
+    }
+    return false
+  }
+  const getInitialBgmEnabled = () => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('applegame_bgmEnabled')
+      return stored === null ? true : stored === 'true'
+    }
+    return true
+  }
+  const getInitialVolume = () => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('applegame_volume')
+      return stored === null ? 75 : Number(stored)
+    }
+    return 75
+  }
+
   const [score, setScore] = useState(0)
   const [timeLeft, setTimeLeft] = useState(120) // 2 minutes in seconds
-  const [bgmEnabled, setBgmEnabled] = useState(true)
-  const [volume, setVolume] = useState(75)
+  const [bgmEnabled, setBgmEnabled] = useState(getInitialBgmEnabled)
+  const [volume, setVolume] = useState(getInitialVolume)
   const [previousVolume, setPreviousVolume] = useState(75) // Store previous volume when BGM is disabled
   const [gameState, setGameState] = useState<GameState>("start") // 게임 상태 추가
   const [isDragging, setIsDragging] = useState(false)
@@ -41,7 +64,6 @@ export default function AppleNumberGame() {
   const [isValidSelection, setIsValidSelection] = useState(false)
   const [selectedCount, setSelectedCount] = useState(0)
   const [resetKey, setResetKey] = useState(0) // Add a key to force timer reset
-  const [audioStarted, setAudioStarted] = useState(false)
   const [activeTool, setActiveTool] = useState<ToolType>(null)
   const [toolUsage, setToolUsage] = useState<ToolUsage>({
     plus: 3,
@@ -49,7 +71,7 @@ export default function AppleNumberGame() {
     random: 3,
     reset: 1,
   })
-  const [eyeComfortMode, setEyeComfortMode] = useState(false)
+  const [eyeComfortMode, setEyeComfortMode] = useState(getInitialEyeComfortMode)
 
   const gameAreaRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -311,7 +333,6 @@ export default function AppleNumberGame() {
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            setAudioStarted(true)
             console.log("Audio started successfully")
           })
           .catch((error) => {
@@ -526,6 +547,25 @@ export default function AppleNumberGame() {
 
   // Calculate progress percentage for the timer bar
   const progressPercentage = useMemo(() => (timeLeft / 120) * 100, [timeLeft])
+
+  // 상태 변경 시 로컬스토리지에 저장
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('applegame_eyeComfortMode', String(eyeComfortMode))
+    }
+  }, [eyeComfortMode])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('applegame_bgmEnabled', String(bgmEnabled))
+    }
+  }, [bgmEnabled])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('applegame_volume', String(volume))
+    }
+  }, [volume])
 
   // 시작 화면 렌더링 - 사과 아이콘 제거
   if (gameState === "start") {
@@ -873,26 +913,6 @@ export default function AppleNumberGame() {
             </div>
           </div>
         </div>
-
-        {/* Play button to explicitly start audio (only shown if audio hasn't started yet) */}
-        {!audioStarted && (
-          <div className="mt-2 text-center">
-            <button
-              onClick={() => {
-                if (audioRef.current) {
-                  audioRef.current.volume = bgmEnabled ? volume / 100 : 0
-                  audioRef.current
-                    .play()
-                    .then(() => setAudioStarted(true))
-                    .catch((e) => console.log("Play button error:", e))
-                }
-              }}
-              className="text-xs text-white underline"
-            >
-              BGM 재생 시작
-            </button>
-          </div>
-        )}
       </div>
 
       <style jsx global>{`
