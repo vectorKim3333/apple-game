@@ -7,6 +7,7 @@ import { Volume2, Plus, Minus, Shuffle, RefreshCw } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
+import { io, Socket } from "socket.io-client"
 
 interface Apple {
   id: string
@@ -25,7 +26,9 @@ interface ToolUsage {
 }
 
 // 게임 상태 타입 추가
-type GameState = "start" | "playing" | "gameover"
+type GameState = "start" | "playing" | "gameover" | "waiting"
+
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL
 
 export default function AppleNumberGame() {
   // 로컬스토리지에서 초기값 불러오기
@@ -72,11 +75,24 @@ export default function AppleNumberGame() {
     reset: 1,
   })
   const [eyeComfortMode, setEyeComfortMode] = useState(getInitialEyeComfortMode)
+  const [onlineMode, setOnlineMode] = useState(false)
+  const [roomId, setRoomId] = useState<string | null>(null)
+  const [waitingOpponent, setWaitingOpponent] = useState(false)
+  const [socketConnected, setSocketConnected] = useState(false)
+  const [showJoinInput, setShowJoinInput] = useState(false)
+  const [joinRoomId, setJoinRoomId] = useState("")
+  const [joinError, setJoinError] = useState("")
+  const [isHost, setIsHost] = useState(false)
+  const [opponentJoined, setOpponentJoined] = useState(false)
+  const [opponentScore, setOpponentScore] = useState(0)
+  const [copied, setCopied] = useState(false)
+  const [gameResult, setGameResult] = useState<string | null>(null)
 
   const gameAreaRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const socketRef = useRef<Socket | null>(null)
 
   // 게임 활성화 상태 계산
   const gameActive = gameState === "playing"
@@ -120,6 +136,7 @@ export default function AppleNumberGame() {
     setGameState("playing")
     setTimeLeft(120)
     setScore(0)
+    setOpponentScore(0)
     setApples(generateGrid())
     setToolUsage({
       plus: 3,
@@ -410,6 +427,7 @@ export default function AppleNumberGame() {
     }
 
     setScore(0)
+    setOpponentScore(0)
     setTimeLeft(120)
     setApples(generateGrid())
     setGameState("playing")
@@ -567,6 +585,181 @@ export default function AppleNumberGame() {
     }
   }, [volume])
 
+  // 소켓 연결 (최초 1회)
+  useEffect(() => {
+    if (!socketRef.current) {
+      if (!SOCKET_URL) {
+        console.error("소켓 서버 URL이 설정되어 있지 않습니다.")
+        return
+      }
+      console.log("[소켓] 연결 시도")
+      socketRef.current = io(SOCKET_URL)
+      socketRef.current.on("connect", () => {
+        console.log("[소켓] 연결 완료")
+        setSocketConnected(true)
+      })
+    }
+    return () => {
+      socketRef.current?.disconnect()
+      socketRef.current = null
+    }
+  }, [])
+
+  // 방 만들기 클릭 핸들러
+  const handleCreateRoom = useCallback(() => {
+    if (!socketRef.current || !socketConnected) {
+      alert("서버 연결 중입니다. 잠시 후 다시 시도해 주세요.")
+      return
+    }
+    console.log("[소켓] createRoom emit")
+    socketRef.current.emit("createRoom")
+    setWaitingOpponent(true)
+    setIsHost(true)
+    setOpponentJoined(false)
+  }, [socketConnected])
+
+  // 소켓 room 생성 및 상대방 입장 대기 이벤트 처리
+  useEffect(() => {
+    if (!socketRef.current) return
+    const socket = socketRef.current
+    socket.on("roomCreated", (id) => {
+      console.log("[소켓] roomCreated 수신", id)
+      setRoomId(id)
+      setGameState("waiting")
+      setShowJoinInput(false)
+      setJoinError("")
+      setIsHost(true)
+      setOpponentJoined(false)
+    })
+    socket.on("joinedRoom", (id) => {
+      setRoomId(id)
+      setGameState("waiting")
+      setShowJoinInput(false)
+      setJoinError("")
+      setIsHost(false)
+      setOpponentJoined(false)
+    })
+    socket.on("joinError", (msg) => {
+      setJoinError(msg)
+    })
+    socket.on("opponentJoined", () => {
+      console.log("[소켓] opponentJoined 수신")
+      setOpponentJoined(true)
+    })
+    socket.on("startGameInRoom", () => {
+      setGameState("playing")
+      setWaitingOpponent(false)
+      setOpponentJoined(false)
+    })
+    return () => {
+      socket.off("roomCreated")
+      socket.off("joinedRoom")
+      socket.off("joinError")
+      socket.off("opponentJoined")
+      socket.off("startGameInRoom")
+    }
+  }, [])
+
+  // room id 복사 함수
+  const handleCopyRoomId = () => {
+    if (roomId) {
+      navigator.clipboard.writeText(roomId)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }
+  }
+
+  // 방 입장 핸들러
+  const handleJoinRoom = useCallback(() => {
+    setJoinError("")
+    if (!socketRef.current || !socketConnected) {
+      alert("서버 연결 중입니다. 잠시 후 다시 시도해 주세요.")
+      return
+    }
+    if (!joinRoomId) {
+      setJoinError("방 코드를 입력하세요.")
+      return
+    }
+    socketRef.current.emit("joinRoom", joinRoomId)
+    setIsHost(false)
+    setOpponentJoined(false)
+  }, [joinRoomId, socketConnected])
+
+  // 방장: 게임 시작 emit
+  const handleStartGameInRoom = () => {
+    if (socketRef.current && roomId) {
+      socketRef.current.emit("startGameInRoom", roomId)
+    }
+  }
+
+  // 점수 동기화: 내 점수 변경 시 emit
+  useEffect(() => {
+    if (!socketRef.current || !roomId || gameState !== "playing") return
+    socketRef.current.emit("scoreUpdate", { roomId, score })
+  }, [score, roomId, gameState])
+
+  // 점수 동기화: 상대방 점수 수신
+  useEffect(() => {
+    if (!socketRef.current) return
+    const socket = socketRef.current
+    socket.on("opponentScoreUpdate", (score) => {
+      setOpponentScore(score)
+    })
+    return () => {
+      socket.off("opponentScoreUpdate")
+    }
+  }, [])
+
+  // 게임 시작 시 점수 초기화
+  useEffect(() => {
+    if (gameState === "playing") {
+      setScore(0)
+      setOpponentScore(0)
+    }
+  }, [gameState])
+
+  // 게임 종료 시 승/패/무 결과 계산
+  useEffect(() => {
+    if (gameState === "gameover" && roomId) {
+      if (score > opponentScore) setGameResult("승리!")
+      else if (score < opponentScore) setGameResult("패배...")
+      else setGameResult("무승부")
+    } else if (gameState !== "gameover") {
+      setGameResult(null)
+    }
+  }, [gameState, score, opponentScore, roomId])
+
+  // 방장: 다시하기 emit
+  const handleRestartGameInRoom = () => {
+    if (socketRef.current && roomId) {
+      socketRef.current.emit("restartGameInRoom", roomId)
+    }
+  }
+
+  // 소켓에서 restartGameInRoom 수신 시 게임 재시작
+  useEffect(() => {
+    if (!socketRef.current) return
+    const socket = socketRef.current
+    socket.on("restartGameInRoom", () => {
+      setGameState("playing")
+      setScore(0)
+      setOpponentScore(0)
+      setTimeLeft(120)
+      setApples(generateGrid())
+      setToolUsage({ plus: 3, minus: 3, random: 3, reset: 1 })
+      setIsDragging(false)
+      setSelectionBox({ x: 0, y: 0, width: 0, height: 0 })
+      setSelectedSum(0)
+      setIsValidSelection(false)
+      setSelectedCount(0)
+      setResetKey((prev) => prev + 1)
+      setActiveTool(null)
+    })
+    return () => {
+      socket.off("restartGameInRoom")
+    }
+  }, [generateGrid])
+
   // 시작 화면 렌더링 - 사과 아이콘 제거
   if (gameState === "start") {
     return (
@@ -603,20 +796,7 @@ export default function AppleNumberGame() {
 
           <div className="flex">
             <div className="relative bg-gradient-to-br from-green-100 to-green-50 p-4 rounded-lg flex-1 flex flex-col items-center justify-center overflow-hidden">
-              {/* 배경 패턴 */}
-              <div className="absolute inset-0 grid grid-cols-10 grid-rows-6 opacity-5">
-                {Array.from({ length: 60 }).map((_, i) => (
-                  <div key={i} className="flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" className="w-8 h-8">
-                      <path
-                        d="M12,3.5c-0.8-0.5-2.2-0.5-3-0.3C7.2,3.6,6,4.8,6,7c-1.8,0.5-3,1.8-3,3.5c0,1,0.2,2.3,0.8,3.5c0.7,1.5,1.7,2.7,3,3.5C8.5,18.8,10.2,19,12,19c1.8,0,3.5-0.2,5.2-1.5c1.3-0.8,2.3-2,3-3.5c0.6-1.2,0.8-2.5,0.8-3.5c0-1.7-1.2-3-3-3.5c0-2.2-1.2-3.4-3-3.8C14.2,3,12.8,3,12,3.5z"
-                        fill="#000"
-                      />
-                    </svg>
-                  </div>
-                ))}
-              </div>
-
+              
               {/* 타이틀 영역 - 사과 아이콘 제거 */}
               <div className="relative flex flex-col items-center mb-6 mt-4">
                 <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-800 to-green-500 drop-shadow-sm mb-2">
@@ -674,22 +854,112 @@ export default function AppleNumberGame() {
                 </div>
               </div>
 
-              <Button
-                onClick={startGame}
-                className="relative overflow-hidden bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-lg px-10 py-3 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl group mb-4"
-              >
-                <span className="relative z-10">게임 시작</span>
-                <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-green-400 to-green-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                <span className="absolute -inset-x-1 bottom-0 h-1 bg-gradient-to-r from-green-300 to-green-400"></span>
-
-                {/* 빛나는 효과 */}
-                <span className="absolute top-0 left-0 w-full h-full">
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-20 bg-white opacity-20 rotate-12 transform-gpu blur-xl"></span>
-                </span>
-              </Button>
+              {/* 온라인 모드/게임 시작 버튼 */}
+              <div className="flex flex-col items-center gap-2 mb-4">
+                {!onlineMode ? (
+                  <>
+                    <Button
+                      onClick={startGame}
+                      className="relative overflow-hidden bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-lg px-10 py-3 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl group mb-2"
+                    >
+                      <span className="relative z-10">게임 시작</span>
+                      <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-green-400 to-green-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                      <span className="absolute -inset-x-1 bottom-0 h-1 bg-gradient-to-r from-green-300 to-green-400"></span>
+                      {/* 빛나는 효과 */}
+                      <span className="absolute top-0 left-0 w-full h-full">
+                        <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-20 bg-white opacity-20 rotate-12 transform-gpu blur-xl"></span>
+                      </span>
+                    </Button>
+                    <Button
+                      onClick={() => setOnlineMode(true)}
+                      className="relative overflow-hidden bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white text-lg px-10 py-3 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl group"
+                    >
+                      <span className="relative z-10">온라인 모드</span>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-2 items-center">
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleCreateRoom}
+                          className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white text-lg px-10 py-3 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl group"
+                        >
+                          <span className="relative z-10">방 만들기</span>
+                        </Button>
+                        <Button
+                          onClick={() => setShowJoinInput((v) => !v)}
+                          className="relative overflow-hidden bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white text-lg px-8 py-3 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl group"
+                        >
+                          <span className="relative z-10">방 코드 입력하기</span>
+                        </Button>
+                      </div>
+                      {showJoinInput && (
+                        <div className="flex flex-col items-center gap-2 mt-2">
+                          <input
+                            type="text"
+                            value={joinRoomId}
+                            onChange={e => setJoinRoomId(e.target.value)}
+                            placeholder="방 코드를 입력하세요"
+                            className="px-4 py-2 rounded border border-gray-300 text-lg text-center"
+                            maxLength={12}
+                            style={{ minWidth: 180 }}
+                          />
+                          <Button onClick={handleJoinRoom} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">입장</Button>
+                          {joinError && <div className="text-red-600 text-sm mt-1">{joinError}</div>}
+                        </div>
+                      )}
+                      <Button
+                        onClick={() => setOnlineMode(false)}
+                        className="mt-2 bg-gray-200 hover:bg-gray-300 text-blue-800 text-base px-8 py-2 rounded-xl shadow cursor-pointer z-10"
+                      >
+                        돌아가기
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
           <audio id="bgm-audio" src="/sounds/bgm.mp3" loop preload="auto" style={{ display: "none" }} />
+        </div>
+      </div>
+    )
+  }
+
+  // 온라인 대기 화면
+  if (gameState === "waiting") {
+    return (
+      <div className="flex items-center justify-center min-h-[84vh] bg-white">
+        <div className="relative w-full max-w-4xl p-4 rounded-3xl bg-green-500 flex flex-col items-center">
+          {!opponentJoined ? (
+            <div className="text-2xl font-bold text-white mb-4">
+              {isHost ? "상대방을 기다리는 중..." : "방장(상대방)이 게임 시작을 누르기를 기다리는 중..."}
+            </div>
+          ) : (
+            isHost ? (
+              <>
+                <div className="text-2xl font-bold text-white mb-4">상대방이 입장했습니다!</div>
+                <Button onClick={handleStartGameInRoom} className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded text-lg font-bold">게임 시작</Button>
+              </>
+            ) : (
+              <div className="text-2xl font-bold text-white mb-4">방장이 게임 시작을 누르기를 기다리는 중...</div>
+            )
+          )}
+          {roomId && (
+            <div className="flex flex-col items-center gap-2 mt-4">
+              <div className="text-lg text-white">Room ID: <span className="font-mono bg-white/80 text-green-700 px-2 py-1 rounded">{roomId}</span></div>
+              <Button onClick={handleCopyRoomId} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded relative">
+                Room ID 복사
+                {copied && (
+                  <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 bg-black text-white text-xs rounded px-2 py-1 whitespace-nowrap z-20 shadow">
+                    복사되었습니다!
+                  </span>
+                )}
+              </Button>
+            </div>
+          )}
+          <Button onClick={() => { setOnlineMode(false); setGameState("start"); setRoomId(null); setWaitingOpponent(false); setOpponentJoined(false); }} className="mt-6 bg-gray-200 hover:bg-gray-300 text-blue-800 text-base px-8 py-2 rounded-xl shadow cursor-pointer">돌아가기</Button>
         </div>
       </div>
     )
@@ -773,8 +1043,15 @@ export default function AppleNumberGame() {
             </div>
 
             {/* Score display */}
-            <div className="absolute top-2 right-4 text-4xl font-bold text-green-800 bg-green-100/90 px-3 py-1 rounded-lg z-10">
-              {score}
+            <div className="absolute top-2 right-4 flex flex-row-reverse items-end gap-1 z-10">
+              <div className="text-2xl font-bold text-green-800 bg-green-100/90 px-3 py-1 rounded-lg">
+                나: {score}
+              </div>
+              {roomId && gameState === "playing" && (
+                <div className="text-2xl font-bold text-blue-800  px-3 py-1 rounded-lg">
+                  상대방: {opponentScore}
+                </div>
+              )}
             </div>
 
             {/* Grid of apples - 고정 높이 추가 */}
@@ -860,15 +1137,26 @@ export default function AppleNumberGame() {
 
         {/* Game over message */}
         {gameState === "gameover" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/70 rounded-3xl">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70 rounded-3xl z-20">
             <div className="bg-white p-8 rounded-xl text-center">
               <div className="text-5xl font-bold mb-6 text-green-500">
                 {score}
                 <span className="text-2xl ml-2 text-gray-600">점</span>
               </div>
-              <Button onClick={resetGame} className="bg-green-500 hover:bg-green-600 text-lg px-6 py-3 h-auto">
-                다시 하기
-              </Button>
+              {roomId && (
+                <div className="mb-4 text-2xl font-bold">
+                  {gameResult && (
+                    <span className={gameResult === "승리!" ? "text-blue-600" : gameResult === "패배..." ? "text-red-500" : "text-gray-700"}>
+                      {gameResult}
+                    </span>
+                  )}
+                </div>
+              )}
+              {(!roomId || isHost) ? (
+                <Button onClick={roomId ? handleRestartGameInRoom : resetGame} className="bg-green-500 hover:bg-green-600 text-lg px-6 py-3 h-auto">
+                  다시 하기
+                </Button>
+              ) : null}
             </div>
           </div>
         )}
