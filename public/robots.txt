@@ -3,4 +3,4 @@ Allow: /
 
 
 # Sitemap
-Sitemap: https://apple-game-beta.vercel.app/sitemap.xml 
+Sitemap: https://www.ggggame.store/sitemap.xml 
