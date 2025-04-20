@@ -14,6 +14,7 @@ interface Apple {
   value: number
   selected: boolean
   removed: boolean
+  isRotten?: boolean
 }
 
 type ToolType = "plus" | "minus" | "random" | "reset" | null
@@ -87,6 +88,8 @@ export default function AppleNumberGame() {
   const [opponentScore, setOpponentScore] = useState(0)
   const [copied, setCopied] = useState(false)
   const [gameResult, setGameResult] = useState<string | null>(null)
+  const [rottenMode, setRottenMode] = useState(true) // 썩은 사과 모드(기본값 true)
+  const [rottenModePending, setRottenModePending] = useState(false) // 썩은 사과 모드 변경 중
 
   const gameAreaRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -108,6 +111,7 @@ export default function AppleNumberGame() {
           value: Math.floor(Math.random() * 9) + 1,
           selected: false,
           removed: false,
+          isRotten: false,
         })
       }
       apples.push(row)
@@ -238,7 +242,7 @@ export default function AppleNumberGame() {
     newApples.forEach((row) => {
       row.forEach((apple) => {
         if (apple.selected && !apple.removed) {
-          sum += apple.value
+          sum += apple.isRotten ? -apple.value : apple.value
           count++
         }
       })
@@ -484,8 +488,19 @@ export default function AppleNumberGame() {
 
     // If selection is valid (sum = 10), remove selected apples and add to score
     if (isValidSelection) {
-      const pointsEarned = selectedCount // Score is based on the number of apples removed
-
+      // 선택된 사과 중 썩은 사과와 일반 사과 개수 모두 카운트
+      const selectedApples = apples.flat().filter(a => a.selected && !a.removed)
+      const normalCount = selectedApples.filter(a => !a.isRotten).length
+      let rottenToSend = 0
+      // 썩은 사과 모드일 때만 공격
+      if (rottenMode && roomId && socketRef.current) {
+        if (normalCount >= 3 && normalCount <= 4) rottenToSend = 1
+        else if (normalCount >= 5) rottenToSend = 2
+        if (rottenToSend > 0) {
+          socketRef.current.emit("sendRottenApple", { roomId, count: rottenToSend })
+        }
+      }
+      const pointsEarned = selectedApples.length // 점수는 선택된 사과 전체 개수
       const newApples = apples.map((row) =>
         row.map((apple) => {
           if (apple.selected && !apple.removed) {
@@ -494,7 +509,6 @@ export default function AppleNumberGame() {
           return { ...apple, selected: false }
         }),
       )
-
       setApples(newApples)
       // 온라인 모드(방에 들어간 경우)라면 서버에 점수 증가 요청 emit
       if (roomId && socketRef.current) {
@@ -511,7 +525,7 @@ export default function AppleNumberGame() {
     setSelectedSum(0)
     setSelectedCount(0)
     setIsValidSelection(false)
-  }, [isDragging, gameActive, isValidSelection, selectedCount, apples, score, roomId])
+  }, [isDragging, gameActive, isValidSelection, apples, score, roomId, rottenMode])
 
   // Toggle BGM
   const handleBgmToggle = (checked: boolean | "indeterminate") => {
@@ -621,6 +635,7 @@ export default function AppleNumberGame() {
     setWaitingOpponent(true)
     setIsHost(true)
     setOpponentJoined(false)
+    setRottenMode(true) // 방장일 때 기본값 true로 초기화
   }, [socketConnected])
 
   // 소켓 room 생성 및 상대방 입장 대기 이벤트 처리
@@ -635,6 +650,7 @@ export default function AppleNumberGame() {
       setJoinError("")
       setIsHost(true)
       setOpponentJoined(false)
+      setRottenMode(true) // 방장일 때 기본값 true로 초기화
     })
     socket.on("joinedRoom", (id) => {
       setRoomId(id)
@@ -651,10 +667,15 @@ export default function AppleNumberGame() {
       console.log("[소켓] opponentJoined 수신")
       setOpponentJoined(true)
     })
-    socket.on("startGameInRoom", () => {
+    socket.on("startGameInRoom", (options) => {
       setGameState("playing")
       setWaitingOpponent(false)
       setOpponentJoined(false)
+      if (options && typeof options.rottenMode === 'boolean') {
+        setRottenMode(options.rottenMode)
+      } else {
+        setRottenMode(true)
+      }
     })
     return () => {
       socket.off("roomCreated")
@@ -693,7 +714,7 @@ export default function AppleNumberGame() {
   // 방장: 게임 시작 emit
   const handleStartGameInRoom = () => {
     if (socketRef.current && roomId) {
-      socketRef.current.emit("startGameInRoom", roomId)
+      socketRef.current.emit("startGameInRoom", roomId, { rottenMode })
     }
   }
 
@@ -741,29 +762,86 @@ export default function AppleNumberGame() {
     }
   }
 
-  // 소켓에서 restartGameInRoom 수신 시 게임 재시작
+  // 썩은 사과 받기 (상대방 공격)
   useEffect(() => {
     if (!socketRef.current) return
     const socket = socketRef.current
-    socket.on("restartGameInRoom", () => {
-      setGameState("playing")
-      setScore(0)
-      setOpponentScore(0)
-      setTimeLeft(120)
-      setApples(generateGrid())
-      setToolUsage({ plus: 3, minus: 3, random: 3, reset: 1 })
-      setIsDragging(false)
-      setSelectionBox({ x: 0, y: 0, width: 0, height: 0 })
-      setSelectedSum(0)
-      setIsValidSelection(false)
-      setSelectedCount(0)
-      setResetKey((prev) => prev + 1)
-      setActiveTool(null)
-    })
-    return () => {
-      socket.off("restartGameInRoom")
+    const handleReceiveRottenApple = ({ count }: { count: number }) => {
+      // 썩은 사과 모드가 아닐 때는 무시
+      if (!rottenMode) return
+      setApples(prev => {
+        let flat = prev.flat()
+        // 1. 빈 공간(removed=true) 중 썩은 사과가 아닌 칸만 후보
+        let emptyCandidates = flat.filter(a => a.removed && !a.isRotten)
+        let applesCopy = prev.map(row => row.slice())
+        let used = 0
+        for (let i = 0; i < count; i++) {
+          if (emptyCandidates.length > 0) {
+            // 빈 공간이 있으면 거기에 생성
+            const idx = Math.floor(Math.random() * emptyCandidates.length)
+            const target = emptyCandidates[idx]
+            const [rowIdx, colIdx] = target.id.split('-').map(Number)
+            const rottenValue = Math.floor(Math.random() * 9) + 1
+            applesCopy[rowIdx][colIdx] = {
+              ...applesCopy[rowIdx][colIdx],
+              isRotten: true,
+              value: rottenValue,
+              removed: false,
+              selected: false,
+            }
+            // 후보에서 제거
+            emptyCandidates = emptyCandidates.filter(a => a.id !== target.id)
+            used++
+          }
+        }
+        // 2. 빈 공간이 부족해서 다 못 넣었으면, 남은 개수만큼 일반 사과 중 랜덤하게 썩은 사과로 변경
+        const remain = count - used
+        if (remain > 0) {
+          let normalCandidates = applesCopy.flat().filter(a => !a.removed && !a.isRotten)
+          for (let i = 0; i < remain; i++) {
+            if (normalCandidates.length === 0) break
+            const idx = Math.floor(Math.random() * normalCandidates.length)
+            const target = normalCandidates[idx]
+            const [rowIdx, colIdx] = target.id.split('-').map(Number)
+            const rottenValue = Math.floor(Math.random() * 9) + 1
+            applesCopy[rowIdx][colIdx] = {
+              ...applesCopy[rowIdx][colIdx],
+              isRotten: true,
+              value: rottenValue,
+            }
+            normalCandidates = normalCandidates.filter(a => a.id !== target.id)
+          }
+        }
+        return applesCopy
+      })
     }
-  }, [generateGrid])
+    socket.on("receiveRottenApple", handleReceiveRottenApple)
+    return () => {
+      socket.off("receiveRottenApple", handleReceiveRottenApple)
+    }
+  }, [rottenMode])
+
+  // 썩은 사과 모드 실시간 동기화 (방장만 emit, 참가자는 on)
+  useEffect(() => {
+    if (!socketRef.current || !roomId) return
+    // 방장만 emit
+    if (isHost && rottenModePending) {
+      socketRef.current.emit("rottenModeChanged", { roomId, rottenMode })
+    }
+  }, [rottenMode, isHost, roomId, rottenModePending])
+
+  useEffect(() => {
+    if (!socketRef.current) return
+    const socket = socketRef.current
+    const handler = (payload: { rottenMode: boolean }) => {
+      setRottenMode(payload.rottenMode)
+      setRottenModePending(false) // 이벤트 수신 시 조작 가능
+    }
+    socket.on("rottenModeChanged", handler)
+    return () => {
+      socket.off("rottenModeChanged", handler)
+    }
+  }, [])
 
   // 시작 화면 렌더링 - 사과 아이콘 제거
   if (gameState === "start") {
@@ -807,8 +885,6 @@ export default function AppleNumberGame() {
                 <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-800 to-green-500 drop-shadow-sm mb-2">
                   사과 게임
                 </h1>
-                <div className="h-1 w-40 bg-gradient-to-r from-green-300 to-green-500 rounded-full mb-2"></div>
-                <div className="h-1 w-20 bg-gradient-to-r from-green-300 to-green-500 rounded-full"></div>
               </div>
 
               <div className="text-center mb-12 max-w-xl relative z-10 px-4">
@@ -856,6 +932,40 @@ export default function AppleNumberGame() {
                       </span>
                     </li>
                   </ul>
+                  <div className="h-px w-full bg-gradient-to-r from-transparent via-green-200 to-transparent my-2"></div>
+                  {/* 온라인 모드일때 썩은 사과 룰 상세 작성 */}
+                  {onlineMode && (
+                    <>
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded border border-blue-300 shadow-sm animate-pulse">온라인 전용</span>
+                      <div className="mt-2 bg-green-50/80 border border-green-200 rounded-lg p-3 text-green-900 text-xs leading-relaxed shadow-sm">
+                        <div className="mb-1 flex items-center  justify-center gap-2">
+                          <div className="font-bold text-green-700 text-sm flex items-center gap-1">
+                            썩은 사과 모드
+                            {/* 일반 사과 SVG */}
+                            <svg viewBox="0 0 24 24" width="24" height="24" className="inline-block align-middle ml-1">
+                              <path d="M12,3.5c-0.8-0.5-2.2-0.5-3-0.3C7.2,3.6,6,4.8,6,7c-1.8,0.5-3,1.8-3,3.5c0,1,0.2,2.3,0.8,3.5c0.7,1.5,1.7,2.7,3,3.5C8.5,18.8,10.2,19,12,19c1.8,0,3.5-0.2,5.2-1.5c1.3-0.8,2.3-2,3-3.5c0.6-1.2,0.8-2.5,0.8-3.5c0-1.7-1.2-3-3-3.5c0-2.2-1.2-3.4-3-3.8C14.2,3,12.8,3,12,3.5z" fill="#FF3B30" />
+                              <path d="M12,2c-0.5,0-1,0.5-1,1c0,0.3,0.1,0.5,0.2,0.7c0.1,0.1,0.2,0.2,0.3,0.3c0.3,0.1,0.7,0.1,1,0c0.1-0.1,0.2-0.2,0.3-0.3C12.9,3.5,13,3.3,13,3C13,2.5,12.5,2,12,2z" fill="#4CD964" />
+                              <path d="M12,3.5c0,0-0.5,0.5-0.5,1.2c0,0.7,0.5,1.3,0.5,1.3s0.5-0.6,0.5-1.3C12.5,4,12,3.5,12,3.5z" fill="#4CD964" />
+                            </svg>
+                            {/* 썩은 사과 SVG */}
+                            <svg viewBox="0 0 24 24" width="24" height="24" className="inline-block align-middle ml-0.5">
+                              <path d="M12,3.5c-0.8-0.5-2.2-0.5-3-0.3C7.2,3.6,6,4.8,6,7c-1.8,0.5-3,1.8-3,3.5c0,1,0.2,2.3,0.8,3.5c0.7,1.5,1.7,2.7,3,3.5C8.5,18.8,10.2,19,12,19c1.8,0,3.5-0.2,5.2-1.5c1.3-0.8,2.3-2,3-3.5c0.6-1.2,0.8-2.5,0.8-3.5c0-1.7-1.2-3-3-3.5c0-2.2-1.2-3.4-3-3.8C14.2,3,12.8,3,12,3.5z" fill="#222" />
+                              <path d="M12,2c-0.5,0-1,0.5-1,1c0,0.3,0.1,0.5,0.2,0.7c0.1,0.1,0.2,0.2,0.3,0.3c0.3,0.1,0.7,0.1,1,0c0.1-0.1,0.2-0.2,0.3-0.3C12.9,3.5,13,3.3,13,3C13,2.5,12.5,2,12,2z" fill="#666" />
+                              <path d="M12,3.5c0,0-0.5,0.5-0.5,1.2c0,0.7,0.5,1.3,0.5,1.3s0.5-0.6,0.5-1.3C12.5,4,12,3.5,12,3.5z" fill="#666" />
+                            </svg>
+                          </div>
+                        </div>
+                        <div>
+                          <b>일반 사과 3개 이상</b>을 한 번에 지우면 상대방에게 <b>썩은 사과</b>가 전송됩니다.<br />
+                          일반 사과 3~4개 지우면 <b>썩은 사과 1개</b>, 5개 이상 지우면 <b>2개</b>가 전송됩니다.<br />
+                          썩은 사과는 <span className="font-bold text-black">검정색</span>으로 표시되며, 숫자는 <span className="font-bold">음수(-n)</span>로 계산됩니다.<br />
+                          썩은 사과도 10을 만들 때 사용할 수 있고 썩은 사과를 제외한 사과만 점수에 포함됩니다.<br />
+                          상대방 필드에 빈 공간이 있으면 그 자리에, 없으면 일반 사과가 무작위로 썩은 사과로 변합니다.<br />
+                          방장이 <b>썩은 사과 모드</b>를 해제하면 해당 기능이 비활성화됩니다.
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -939,19 +1049,64 @@ export default function AppleNumberGame() {
     return (
       <div className="flex items-center justify-center min-h-[84vh] bg-white">
         <div className="relative w-full max-w-4xl p-4 rounded-3xl bg-green-500 flex flex-col items-center">
-          {!opponentJoined ? (
-            <div className="text-2xl font-bold text-white mb-4">
-              {isHost ? "상대방을 기다리는 중..." : "방장이 게임 시작을 누르기를 기다리는 중..."}
-            </div>
-          ) : (
-            isHost ? (
+          {isHost ? (
+            opponentJoined ? (
               <>
                 <div className="text-2xl font-bold text-white mb-4">상대가 입장했습니다!</div>
+                {/* 썩은 사과 모드 체크박스 (방장만) */}
+                <div className="flex flex-col items-center mb-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <input
+                      type="checkbox"
+                      id="rotten-mode"
+                      checked={rottenMode}
+                      onChange={e => {
+                        setRottenMode(e.target.checked)
+                        setRottenModePending(true)
+                      }}
+                      className="w-5 h-5 accent-black border-gray-300 rounded"
+                      disabled={rottenModePending}
+                    />
+                    <label htmlFor="rotten-mode" className="text-white font-medium text-lg select-none">썩은 사과 모드</label>
+                  </div>
+                  <div className="text-xs text-white/90 bg-black/20 rounded px-2 py-1 max-w-xs text-center">
+                    썩은 사과 모드에서는<br />
+                    <b>일반 사과 3개 이상</b>을 한 번에 지우면<br />
+                    상대방에게 <b>썩은 사과</b>가 생성됩니다.<br />
+                    썩은 사과는 <span className="font-bold">검정색</span>이며,<br />
+                    합산 시 <span className="font-bold">음수</span>로 계산됩니다.
+                  </div>
+                </div>
                 <Button onClick={handleStartGameInRoom} className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded text-lg font-bold">게임 시작</Button>
               </>
             ) : (
-              <div className="text-2xl font-bold text-white mb-4">방장이 게임 시작을 누르기를 기다리는 중...</div>
+              <div className="text-2xl font-bold text-white mb-4">상대방을 기다리는 중...</div>
             )
+          ) : (
+            <>
+              <div className="text-2xl font-bold text-white mb-4">방장이 게임 시작을 누르기를 기다리는 중...</div>
+              {/* 참가자도 썩은 사과 모드 상태와 설명을 항상 볼 수 있음 */}
+              <div className="flex flex-col items-center mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <input
+                    type="checkbox"
+                    id="rotten-mode-view"
+                    checked={rottenMode}
+                    readOnly
+                    className="w-5 h-5 accent-black border-gray-300 rounded cursor-not-allowed"
+                  />
+                  <label htmlFor="rotten-mode-view" className="text-white font-medium text-lg select-none">썩은 사과 모드</label>
+                  <span className={`ml-2 text-xs font-bold ${rottenMode ? 'text-green-200' : 'text-red-200'}`}>{rottenMode ? 'ON' : 'OFF'}</span>
+                </div>
+                <div className="text-xs text-white/90 bg-black/20 rounded px-2 py-1 max-w-xs text-center">
+                  썩은 사과 모드에서는<br />
+                  <b>일반 사과 3개 이상</b>을 한 번에 지우면<br />
+                  상대방에게 <b>썩은 사과</b>가 생성됩니다.<br />
+                  썩은 사과는 <span className="font-bold">검정색</span>이며,<br />
+                  합산 시 <span className="font-bold">음수</span>로 계산됩니다.
+                </div>
+              </div>
+            </>
           )}
           {roomId && (isHost && !opponentJoined) && (
             <div className="flex flex-col items-center gap-2 mt-4">
@@ -1084,7 +1239,9 @@ export default function AppleNumberGame() {
                           <path
                             d="M12,3.5c-0.8-0.5-2.2-0.5-3-0.3C7.2,3.6,6,4.8,6,7c-1.8,0.5-3,1.8-3,3.5c0,1,0.2,2.3,0.8,3.5c0.7,1.5,1.7,2.7,3,3.5C8.5,18.8,10.2,19,12,19c1.8,0,3.5-0.2,5.2-1.5c1.3-0.8,2.3-2,3-3.5c0.6-1.2,0.8-2.5,0.8-3.5c0-1.7-1.2-3-3-3.5c0-2.2-1.2-3.4-3-3.8C14.2,3,12.8,3,12,3.5z"
                             fill={
-                              apple.selected && isValidSelection
+                              apple.isRotten
+                                ? (eyeComfortMode ? "#BBB" : "#222")
+                                : apple.selected && isValidSelection
                                 ? eyeComfortMode
                                   ? "#FF9999"
                                   : "#FF0000"
@@ -1095,14 +1252,14 @@ export default function AppleNumberGame() {
                           />
                           <path
                             d="M12,2c-0.5,0-1,0.5-1,1c0,0.3,0.1,0.5,0.2,0.7c0.1,0.1,0.2,0.2,0.3,0.3c0.3,0.1,0.7,0.1,1,0c0.1-0.1,0.2-0.2,0.3-0.3C12.9,3.5,13,3.3,13,3C13,2.5,12.5,2,12,2z"
-                            fill="#4CD964"
+                            fill={apple.isRotten ? (eyeComfortMode ? "#DDD" : "#666") : "#4CD964"}
                           />
                           <path
                             d="M12,3.5c0,0-0.5,0.5-0.5,1.2c0,0.7,0.5,1.3,0.5,1.3s0.5-0.6,0.5-1.3C12.5,4,12,3.5,12,3.5z"
-                            fill="#4CD964"
+                            fill={apple.isRotten ? (eyeComfortMode ? "#DDD" : "#666") : "#4CD964"}
                           />
                         </svg>
-                        <span className="absolute text-white font-bold text-lg">{apple.value}</span>
+                        <span className={`absolute font-bold text-lg ${apple.isRotten ? (eyeComfortMode ? 'text-gray-400' : 'text-gray-200') : 'text-white'}`}>{apple.isRotten ? `-${apple.value}` : apple.value}</span>
                       </div>
                     ) : (
                       // 제거된 사과는 투명한 공간으로 유지
