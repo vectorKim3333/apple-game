@@ -11,6 +11,7 @@ interface WaveRectangleProps {
   stoneColor: string
   stoneImage?: string
   activeTab: "color" | "image" // 추가: 현재 활성화된 탭
+  waveConstants: typeof import("@/app/constants/wave-animation").WAVE_CONSTANTS
 }
 
 interface Stone {
@@ -181,6 +182,7 @@ export default function WaveRectangle({
   stoneColor,
   stoneImage,
   activeTab,
+  waveConstants,
 }: WaveRectangleProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const height = width * 0.6 // Set height proportional to width
@@ -198,13 +200,13 @@ export default function WaveRectangle({
     x: 0,
     y: 0,
     startTime: 0,
-    size: 3,
+    size: waveConstants.MIN_STONE_SIZE,
     isDragging: false,
     lastStoneTime: 0,
     initialX: 0,
     initialY: 0,
     stoneDropped: false,
-    grownSize: 3,
+    grownSize: waveConstants.MIN_STONE_SIZE,
   })
 
   // Refs to store stones and ripples
@@ -263,11 +265,11 @@ export default function WaveRectangle({
     let time = 0
 
     // Wave parameters
-    const waveCount = 3
+    const waveCount = waveConstants.WAVE_COUNT
     const waves = Array.from({ length: waveCount }, (_, i) => ({
       amplitude: 8 + i * 4,
       frequency: 0.02 - i * 0.005,
-      speed: 0.05 + i * 0.02,
+      speed: waveConstants.WAVE_SPEED + i * 0.02,
       phase: 0,
       color: `rgba(0, 120, 255, ${0.3 - i * 0.1})`,
     }))
@@ -305,7 +307,7 @@ export default function WaveRectangle({
           y: 0,
           radius: 0,
           maxRadius: 0,
-          strength: 0,
+          strength: waveConstants.RIPPLE_STRENGTH,
           opacity: 1,
           age: 0,
           active: false,
@@ -318,7 +320,7 @@ export default function WaveRectangle({
       ripple.y = y
       ripple.radius = 5
       ripple.maxRadius = 100 + stoneSize * 10 // Larger stones create larger ripples
-      ripple.strength = 15 + stoneSize * 2 // Larger stones create stronger ripples
+      ripple.strength = waveConstants.RIPPLE_STRENGTH + stoneSize * 2 // Larger stones create stronger ripples
       ripple.opacity = 1
       ripple.age = 0
       ripple.active = true
@@ -499,7 +501,7 @@ export default function WaveRectangle({
         if (stone.active) {
           // Update stone position with gravity
           stone.y += stone.velocity
-          stone.velocity += 0.18 // Gravity effect reduced by 10%
+          stone.velocity += waveConstants.STONE_GRAVITY
 
           // Check if stone hit water
           if (stone.y >= waterLevelRef.current && stone.velocity > 0) {
@@ -548,7 +550,7 @@ export default function WaveRectangle({
       if (holdState.isHolding && !holdState.isDragging && holdState.y < waterLevelRef.current) {
         // Calculate growing size based on hold duration
         const holdDuration = Date.now() - holdState.startTime
-        holdState.size = Math.min(20, 3 + holdDuration / 100)
+        holdState.size = Math.min(waveConstants.MAX_STONE_SIZE, waveConstants.MIN_STONE_SIZE + holdDuration / 100)
         holdState.grownSize = holdState.size // Store the current grown size
 
         // Draw growing stone preview with image or color
@@ -581,7 +583,7 @@ export default function WaveRectangle({
       isAnimatingRef.current = false
       cancelAnimationFrame(animationFrameIdRef.current)
     }
-  }, [width, activeTab])
+  }, [width, activeTab, waveConstants])
 
   useEffect(() => {
     // Set up mouse event handlers
@@ -606,13 +608,13 @@ export default function WaveRectangle({
           x,
           y,
           startTime: Date.now(),
-          size: 3,
+          size: waveConstants.MIN_STONE_SIZE,
           isDragging: false,
           lastStoneTime: 0,
           initialX: x,
           initialY: y,
           stoneDropped: false,
-          grownSize: 3,
+          grownSize: waveConstants.MIN_STONE_SIZE,
         }
       }
     }
@@ -678,26 +680,23 @@ export default function WaveRectangle({
           const dx = x - holdState.initialX
           const dy = y - holdState.initialY
           const distance = Math.sqrt(dx * dx + dy * dy)
-
-          // If moved more than 5 pixels, switch to dragging mode
-          if (distance > 5) {
+          // If moved more than DRAG_THRESHOLD pixels, switch to dragging mode
+          if (distance > waveConstants.DRAG_THRESHOLD) {
             holdState.isDragging = true
             // Store the current grown size when dragging starts
             holdState.grownSize = Math.max(holdState.grownSize, holdState.size)
           }
         }
-
         // If in dragging mode, create stones of the grown size along the path
         if (holdState.isDragging && y < waterLevelRef.current) {
           const now = Date.now()
-          // Create stones at a rate of about 20 per second (50ms interval)
-          if (now - holdState.lastStoneTime > 50) {
+          // Create stones at a rate of about 20 per second (STONE_CREATION_INTERVAL)
+          if (now - holdState.lastStoneTime > waveConstants.STONE_CREATION_INTERVAL) {
             // Use the grown size for all stones created during dragging
             createStone(x, y, holdState.grownSize)
             holdState.lastStoneTime = now
           }
         }
-
         // Update position
         holdStateRef.current.x = x
         holdStateRef.current.y = y
@@ -787,7 +786,7 @@ export default function WaveRectangle({
 
       cleanup?.()
     }
-  }, [setupAnimation, activeTab])
+  }, [setupAnimation, activeTab, waveConstants])
 
   return (
     <div className="relative">

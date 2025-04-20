@@ -8,6 +8,9 @@ export const WAVE_CONSTANTS = {
   RIPPLE_MAX_AGE: 180,
   WAVE_COUNT: 3,
   DPR: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
+  STONE_GRAVITY: 0.18,
+  RIPPLE_STRENGTH: 15,
+  WAVE_SPEED: 0.05,
 } as const
 
 export const WAVE_COLORS = {

@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { ColorPicker } from "./color-picker"
 import { Slider } from "@/components/ui/slider"
 import { ImageUploader } from "./image-uploader"
 import WaveRectangle from "./wave-animation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { WAVE_CONSTANTS } from '../constants/wave-animation'
 
 // 색상 옵션 배열 추가
 const colorOptions = [
@@ -17,6 +18,18 @@ const colorOptions = [
   { name: "노랑", value: "#FFAA00" },
 ]
 
+const WAVE_LABELS: Record<string, string> = {
+  MIN_STONE_SIZE: "최소 돌 크기(px)",
+  MAX_STONE_SIZE: "최대 돌 크기(px)",
+  DRAG_THRESHOLD: "드래그 전환 거리(픽셀)",
+  STONE_CREATION_INTERVAL: "돌 생성 간격(ms)",
+  STONE_GRAVITY: "돌이 떨어지는 속도",
+  RIPPLE_STRENGTH: "물결 강도",
+  WAVE_SPEED: "물결 이동 속도",
+}
+
+const STORAGE_KEY = 'watermeditation_settings'
+
 export default function DemoPage() {
   const [rectWidth, setRectWidth] = useState(400)
   const [isMobile, setIsMobile] = useState(false)
@@ -24,6 +37,18 @@ export default function DemoPage() {
   const [lastSelectedColor, setLastSelectedColor] = useState("#000000") // 마지막으로 선택한 색상 저장
   const [stoneImage, setStoneImage] = useState<string>("")
   const [activeTab, setActiveTab] = useState<"color" | "image">("color")
+  const [waveConstants, setWaveConstants] = useState({
+    MIN_STONE_SIZE: WAVE_CONSTANTS.MIN_STONE_SIZE,
+    MAX_STONE_SIZE: WAVE_CONSTANTS.MAX_STONE_SIZE,
+    DRAG_THRESHOLD: WAVE_CONSTANTS.DRAG_THRESHOLD,
+    STONE_CREATION_INTERVAL: WAVE_CONSTANTS.STONE_CREATION_INTERVAL,
+    STONE_GRAVITY: WAVE_CONSTANTS.STONE_GRAVITY,
+    RIPPLE_STRENGTH: WAVE_CONSTANTS.RIPPLE_STRENGTH,
+    WAVE_SPEED: WAVE_CONSTANTS.WAVE_SPEED,
+  })
+
+  // 디바운스 타이머 ref
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null)
 
   // Detect mobile devices
   useEffect(() => {
@@ -63,6 +88,34 @@ export default function DemoPage() {
     }
   }, [selectedColor, activeTab])
 
+  // 마운트 시 로컬스토리지에서 불러오기
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (typeof parsed.rectWidth === 'number') setRectWidth(parsed.rectWidth)
+        if (typeof parsed.waveConstants === 'object' && parsed.waveConstants) {
+          setWaveConstants((prev) => ({ ...prev, ...parsed.waveConstants }))
+        }
+      } catch {}
+    }
+  }, [])
+
+  // rectWidth, waveConstants 변경 시 디바운스로 로컬스토리지 저장
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ rectWidth, waveConstants })
+      )
+    }, 300)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rectWidth, waveConstants])
+
   // 탭 변경 처리
   const handleTabChange = (value: string) => {
     const newTab = value as "color" | "image"
@@ -74,29 +127,110 @@ export default function DemoPage() {
     }
   }
 
+  const handleWaveConstantChange = (key: keyof typeof waveConstants, value: number) => {
+    setWaveConstants(prev => ({ ...prev, [key]: value }))
+  }
+
+  // 실제로 WaveRectangle에 전달할 전체 상수 객체 생성
+  const mergedWaveConstants = {
+    ...WAVE_CONSTANTS,
+    ...waveConstants,
+  }
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-8 bg-gradient-to-b from-sky-50 to-blue-100">
       <h1 className="text-2xl sm:text-3xl font-bold text-blue-800 mb-6 sm:mb-8 text-center">
-        Interactive Wave Animation
+        물멍
       </h1>
 
       <div className="mb-6 sm:mb-8">
-        <WaveRectangle width={rectWidth} stoneColor={selectedColor} stoneImage={stoneImage} activeTab={activeTab} />
+        <WaveRectangle
+          width={rectWidth}
+          stoneColor={selectedColor}
+          stoneImage={stoneImage}
+          activeTab={activeTab}
+          waveConstants={mergedWaveConstants}
+        />
       </div>
 
-      <div className="w-full max-w-md px-2 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Rectangle Width: {rectWidth}px</label>
-          <Slider
-            value={[rectWidth]}
-            min={200}
-            max={isMobile ? window.innerWidth - 40 : 1440}
-            step={10}
-            onValueChange={(value) => setRectWidth(value[0])}
-            className="mb-6 sm:mb-8"
-          />
+      {/* Wave Animation 설정 아코디언 */}
+      <details className="w-full max-w-md mb-4" open>
+        <summary className="font-semibold text-blue-700 cursor-pointer py-2">Wave Animation 설정</summary>
+        <div className="space-y-3 p-2 bg-white bg-opacity-80 rounded-md shadow">
+          {/* Rectangle Width 슬라이더 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">가로 크기: {rectWidth}px</label>
+            <div className="flex items-center gap-2">
+              <Slider
+                value={[rectWidth]}
+                min={200}
+                max={isMobile ? window.innerWidth - 40 : 1440}
+                step={10}
+                onValueChange={(value) => setRectWidth(value[0])}
+                className="mb-2 flex-1"
+              />
+              <button
+                type="button"
+                className="ml-2 p-0 w-6 h-6 flex items-center justify-center bg-transparent border-none hover:text-blue-600"
+                aria-label="가로 크기 초기화"
+                onClick={() => setRectWidth(400)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M12.1333 3.88611V2.93334C12.1333 2.54674 12.4467 2.23334 12.8333 2.23334C13.2199 2.23334 13.5333 2.54674 13.5333 2.93334V5.60001C13.5333 5.98661 13.2199 6.30001 12.8333 6.30001H10.2475C9.86088 6.30001 9.54748 5.98661 9.54748 5.60001C9.54748 5.21341 9.86088 4.90001 10.2475 4.90001H11.1619C10.3402 3.95461 9.15221 3.36667 7.83839 3.36667C5.38888 3.36667 3.36667 5.42063 3.36667 8.00001C3.36667 10.5794 5.38888 12.6333 7.83839 12.6333C9.80498 12.6333 11.4931 11.3132 12.0856 9.4541C12.203 9.08576 12.5968 8.88233 12.9651 8.99973C13.3335 9.11713 13.5369 9.5109 13.4195 9.87924C12.6547 12.2788 10.4555 14.0333 7.83839 14.0333C4.57538 14.0333 1.96667 11.3117 1.96667 8.00001C1.96667 4.68835 4.57538 1.96667 7.83839 1.96667C9.539 1.96667 11.0646 2.70874 12.1333 3.88611Z" fill="#222222"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          {/* waveConstants 슬라이더 */}
+          {Object.entries(waveConstants).map(([key, value]) => (
+            <div key={key} className="flex items-center gap-2">
+              <label className="w-32 text-sm font-medium text-gray-700">{WAVE_LABELS[key] ?? key}</label>
+              <input
+                type="range"
+                min={key === 'MIN_STONE_SIZE' ? 1 : key === 'MAX_STONE_SIZE' ? 5 : key === 'STONE_GRAVITY' ? 0.05 : key === 'RIPPLE_STRENGTH' ? 1 : key === 'WAVE_SPEED' ? 0.01 : 0}
+                max={key === 'MIN_STONE_SIZE' ? 20 : key === 'MAX_STONE_SIZE' ? 50 : key === 'STONE_GRAVITY' ? 1 : key === 'RIPPLE_STRENGTH' ? 50 : key === 'WAVE_SPEED' ? 0.2 : 200}
+                step={key === 'STONE_GRAVITY' || key === 'WAVE_SPEED' ? 0.01 : 1}
+                value={value}
+                onChange={e => handleWaveConstantChange(key as keyof typeof waveConstants, (key === 'STONE_GRAVITY' || key === 'WAVE_SPEED') ? Number(parseFloat(e.target.value)) : Number(e.target.value))}
+                className="flex-1"
+              />
+              <span className="w-8 text-right">{value}</span>
+              <button
+                type="button"
+                className="p-0 w-6 h-6 flex items-center justify-center bg-transparent border-none hover:text-blue-600"
+                aria-label={`${WAVE_LABELS[key] ?? key} 초기화`}
+                onClick={() => handleWaveConstantChange(key as keyof typeof waveConstants, WAVE_CONSTANTS[key as keyof typeof WAVE_CONSTANTS])}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M12.1333 3.88611V2.93334C12.1333 2.54674 12.4467 2.23334 12.8333 2.23334C13.2199 2.23334 13.5333 2.54674 13.5333 2.93334V5.60001C13.5333 5.98661 13.2199 6.30001 12.8333 6.30001H10.2475C9.86088 6.30001 9.54748 5.98661 9.54748 5.60001C9.54748 5.21341 9.86088 4.90001 10.2475 4.90001H11.1619C10.3402 3.95461 9.15221 3.36667 7.83839 3.36667C5.38888 3.36667 3.36667 5.42063 3.36667 8.00001C3.36667 10.5794 5.38888 12.6333 7.83839 12.6333C9.80498 12.6333 11.4931 11.3132 12.0856 9.4541C12.203 9.08576 12.5968 8.88233 12.9651 8.99973C13.3335 9.11713 13.5369 9.5109 13.4195 9.87924C12.6547 12.2788 10.4555 14.0333 7.83839 14.0333C4.57538 14.0333 1.96667 11.3117 1.96667 8.00001C1.96667 4.68835 4.57538 1.96667 7.83839 1.96667C9.539 1.96667 11.0646 2.70874 12.1333 3.88611Z" fill="#222222"/>
+                </svg>
+              </button>
+            </div>
+          ))}
+          <div className="flex justify-end">
+          <button
+            type="button"
+            className="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded shadow text-sm font-semibold border border-blue-200 transition"
+            onClick={() => {
+              setRectWidth(400)
+              setWaveConstants({
+                MIN_STONE_SIZE: WAVE_CONSTANTS.MIN_STONE_SIZE,
+                MAX_STONE_SIZE: WAVE_CONSTANTS.MAX_STONE_SIZE,
+                DRAG_THRESHOLD: WAVE_CONSTANTS.DRAG_THRESHOLD,
+                STONE_CREATION_INTERVAL: WAVE_CONSTANTS.STONE_CREATION_INTERVAL,
+                STONE_GRAVITY: WAVE_CONSTANTS.STONE_GRAVITY,
+                RIPPLE_STRENGTH: WAVE_CONSTANTS.RIPPLE_STRENGTH,
+                WAVE_SPEED: WAVE_CONSTANTS.WAVE_SPEED,
+              })
+            }}
+          >
+            전체 초기화
+          </button>
         </div>
+        </div>
+      </details>
 
+      <div className="w-full max-w-md px-2 space-y-4">
         <Tabs defaultValue="color" className="w-full" onValueChange={handleTabChange}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="color">색상 선택</TabsTrigger>
