@@ -496,7 +496,12 @@ export default function AppleNumberGame() {
       )
 
       setApples(newApples)
-      setScore(score + pointsEarned)
+      // 온라인 모드(방에 들어간 경우)라면 서버에 점수 증가 요청 emit
+      if (roomId && socketRef.current) {
+        socketRef.current.emit("scoreAddRequest", { roomId, add: pointsEarned })
+      } else {
+        setScore(score + pointsEarned) // 오프라인일 때만 직접 증가
+      }
     } else {
       // Just clear selection if not valid
       setApples(apples.map((row) => row.map((apple) => ({ ...apple, selected: false }))))
@@ -506,7 +511,7 @@ export default function AppleNumberGame() {
     setSelectedSum(0)
     setSelectedCount(0)
     setIsValidSelection(false)
-  }, [isDragging, gameActive, isValidSelection, selectedCount, apples, score])
+  }, [isDragging, gameActive, isValidSelection, selectedCount, apples, score, roomId])
 
   // Toggle BGM
   const handleBgmToggle = (checked: boolean | "indeterminate") => {
@@ -692,21 +697,21 @@ export default function AppleNumberGame() {
     }
   }
 
-  // 점수 동기화: 내 점수 변경 시 emit
-  useEffect(() => {
-    if (!socketRef.current || !roomId || gameState !== "playing") return
-    socketRef.current.emit("scoreUpdate", { roomId, score })
-  }, [score, roomId, gameState])
-
-  // 점수 동기화: 상대방 점수 수신
+  // 점수 동기화: 서버에서 scoreUpdated 이벤트 수신
   useEffect(() => {
     if (!socketRef.current) return
     const socket = socketRef.current
-    socket.on("opponentScoreUpdate", (score) => {
-      setOpponentScore(score)
-    })
+    const handleScoreUpdated = ({ scores }: { scores: Record<string, number> }) => {
+      if (!socket.id || !scores) return
+      const myScore = scores[socket.id] ?? 0
+      // 상대방 점수: 내 socket.id가 아닌 첫 번째 값
+      const oppScore = Object.entries(scores).find(([id]) => id !== socket.id)?.[1] ?? 0
+      setScore(myScore)
+      setOpponentScore(oppScore)
+    }
+    socket.on("scoreUpdated", handleScoreUpdated)
     return () => {
-      socket.off("opponentScoreUpdate")
+      socket.off("scoreUpdated", handleScoreUpdated)
     }
   }, [])
 
@@ -884,14 +889,16 @@ export default function AppleNumberGame() {
                         <Button
                           onClick={handleCreateRoom}
                           className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white text-lg px-10 py-3 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl group"
+                          disabled={!socketConnected}
                         >
-                          <span className="relative z-10">방 만들기</span>
+                          <span className="relative z-10">{socketConnected ? "방 만들기" : "서버 연결중..."}</span>
                         </Button>
                         <Button
                           onClick={() => setShowJoinInput((v) => !v)}
                           className="relative overflow-hidden bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white text-lg px-8 py-3 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl group"
+                          disabled={!socketConnected}
                         >
-                          <span className="relative z-10">방 코드 입력하기</span>
+                          <span className="relative z-10">{socketConnected ? "방 코드 입력하기" : "서버 연결중..."}</span>
                         </Button>
                       </div>
                       {showJoinInput && (
@@ -934,19 +941,19 @@ export default function AppleNumberGame() {
         <div className="relative w-full max-w-4xl p-4 rounded-3xl bg-green-500 flex flex-col items-center">
           {!opponentJoined ? (
             <div className="text-2xl font-bold text-white mb-4">
-              {isHost ? "상대방을 기다리는 중..." : "방장(상대방)이 게임 시작을 누르기를 기다리는 중..."}
+              {isHost ? "상대방을 기다리는 중..." : "방장이 게임 시작을 누르기를 기다리는 중..."}
             </div>
           ) : (
             isHost ? (
               <>
-                <div className="text-2xl font-bold text-white mb-4">상대방이 입장했습니다!</div>
+                <div className="text-2xl font-bold text-white mb-4">상대가 입장했습니다!</div>
                 <Button onClick={handleStartGameInRoom} className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded text-lg font-bold">게임 시작</Button>
               </>
             ) : (
               <div className="text-2xl font-bold text-white mb-4">방장이 게임 시작을 누르기를 기다리는 중...</div>
             )
           )}
-          {roomId && (
+          {roomId && (isHost && !opponentJoined) && (
             <div className="flex flex-col items-center gap-2 mt-4">
               <div className="text-lg text-white">Room ID: <span className="font-mono bg-white/80 text-green-700 px-2 py-1 rounded">{roomId}</span></div>
               <Button onClick={handleCopyRoomId} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded relative">
@@ -1045,11 +1052,11 @@ export default function AppleNumberGame() {
             {/* Score display */}
             <div className="absolute top-2 right-4 flex flex-row-reverse items-end gap-1 z-10">
               <div className="text-2xl font-bold text-green-800 bg-green-100/90 px-3 py-1 rounded-lg">
-                나: {score}
+                {roomId && "나:"} {score}
               </div>
               {roomId && gameState === "playing" && (
                 <div className="text-2xl font-bold text-blue-800  px-3 py-1 rounded-lg">
-                  상대방: {opponentScore}
+                  상대: {opponentScore}
                 </div>
               )}
             </div>
@@ -1166,10 +1173,12 @@ export default function AppleNumberGame() {
 
         {/* Controls */}
         <div className="flex items-center justify-between mt-4">
-          <Button onClick={resetGame} className="bg-white text-green-800 hover:bg-gray-100 border border-green-300">
-            초기화
-          </Button>
-
+          {!roomId ? (
+            <Button onClick={resetGame} className="bg-white text-green-800 hover:bg-gray-100 border border-green-300">
+              초기화
+            </Button>
+          ) : <div /> }
+          
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Checkbox

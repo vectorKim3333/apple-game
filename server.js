@@ -39,10 +39,21 @@ function generateRoomId(length = 6) {
   return result
 }
 
+// 방별 점수 저장
+const roomScores = {}; // { roomId: { [socketId]: 점수, ... } }
+
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
   socket.on('disconnect', () => {
+    for (const roomId in roomScores) {
+      if (roomScores[roomId][socket.id] !== undefined) {
+        delete roomScores[roomId][socket.id];
+        if (Object.keys(roomScores[roomId]).length === 0) {
+          delete roomScores[roomId];
+        }
+      }
+    }
     console.log('User disconnected:', socket.id);
   });
 
@@ -55,6 +66,8 @@ io.on('connection', (socket) => {
   socket.on('createRoom', () => {
     const roomId = generateRoomId();
     socket.join(roomId);
+    // 점수 초기화
+    roomScores[roomId] = { [socket.id]: 0 };
     console.log(`[room] ${socket.id} created room ${roomId}`);
     socket.emit('roomCreated', roomId);
   });
@@ -71,6 +84,9 @@ io.on('connection', (socket) => {
       return;
     }
     socket.join(roomId);
+    // 점수 등록
+    if (!roomScores[roomId]) roomScores[roomId] = {};
+    roomScores[roomId][socket.id] = 0;
     console.log(`[room] ${socket.id} joined room ${roomId}`);
     // 방에 2명이 되면 양쪽에 알림
     if (room.size === 2) {
@@ -85,15 +101,23 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('startGameInRoom');
   });
 
-  // 점수 동기화
-  socket.on('scoreUpdate', ({ roomId, score }) => {
-    // 같은 방의 다른 소켓에게만 전달
-    socket.to(roomId).emit('opponentScoreUpdate', score);
+  // 점수 증가 요청 및 동기화
+  socket.on('scoreAddRequest', ({ roomId, add }) => {
+    if (!roomScores[roomId]) return;
+    if (!roomScores[roomId][socket.id]) roomScores[roomId][socket.id] = 0;
+    roomScores[roomId][socket.id] += add;
+    io.to(roomId).emit('scoreUpdated', { scores: roomScores[roomId] });
   });
 
-  // 게임 다시 시작 동기화
+  // 게임 다시 시작 시 점수 초기화
   socket.on('restartGameInRoom', (roomId) => {
     console.log(`[room] ${socket.id} requested restartGameInRoom for ${roomId}`);
+    if (roomScores[roomId]) {
+      Object.keys(roomScores[roomId]).forEach(id => {
+        roomScores[roomId][id] = 0;
+      });
+      io.to(roomId).emit('scoreUpdated', { scores: roomScores[roomId] });
+    }
     io.to(roomId).emit('restartGameInRoom');
   });
 });
