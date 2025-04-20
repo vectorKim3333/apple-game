@@ -22,7 +22,6 @@
 
 ## 🌟 주요 기능
 
-- 반응형 디자인, 모바일/PC 모두 최적화
 - 온라인 대전 및 실시간 점수 동기화
 - 썩은 사과 등 다양한 게임 모드
 - 부드러운 애니메이션과 인터랙션
@@ -45,6 +44,7 @@
 - 웹사이트: [https://www.ggggame.store](https://www.ggggame.store)
 - 사과 게임: [https://www.ggggame.store/apple-game](https://www.ggggame.store/apple-game)
 - 물멍: [https://www.ggggame.store/water-meditation](https://www.ggggame.store/water-meditation)
+- 타일 게임: [https://www.ggggame.store/color-tiles](https://www.ggggame.store/color-tiles)
 
 ## 📝 라이선스
 
