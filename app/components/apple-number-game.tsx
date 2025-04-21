@@ -650,7 +650,7 @@ export default function AppleNumberGame() {
       setJoinError("")
       setIsHost(true)
       setOpponentJoined(false)
-      setRottenMode(true) // 방장일 때 기본값 true로 초기화
+      setRottenMode(true)
     })
     socket.on("joinedRoom", (id) => {
       setRoomId(id)
@@ -671,11 +671,27 @@ export default function AppleNumberGame() {
       setGameState("playing")
       setWaitingOpponent(false)
       setOpponentJoined(false)
+      setScore(0)
+      setOpponentScore(0)
+      setGameResult(null)
       if (options && typeof options.rottenMode === 'boolean') {
         setRottenMode(options.rottenMode)
       } else {
         setRottenMode(true)
       }
+    })
+    socket.on("restartGameInRoom", () => {
+      setGameState("playing")
+      setScore(0)
+      setOpponentScore(0)
+      setApples(generateGrid())
+      setToolUsage({
+        plus: 3,
+        minus: 3,
+        random: 3,
+        reset: 1,
+      })
+      setGameResult(null)
     })
     return () => {
       socket.off("roomCreated")
@@ -683,8 +699,9 @@ export default function AppleNumberGame() {
       socket.off("joinError")
       socket.off("opponentJoined")
       socket.off("startGameInRoom")
+      socket.off("restartGameInRoom")
     }
-  }, [])
+  }, [generateGrid])
 
   // room id 복사 함수
   const handleCopyRoomId = () => {
@@ -759,6 +776,18 @@ export default function AppleNumberGame() {
   const handleRestartGameInRoom = () => {
     if (socketRef.current && roomId) {
       socketRef.current.emit("restartGameInRoom", roomId)
+      // 게임 상태 초기화
+      setGameState("playing")
+      setScore(0)
+      setOpponentScore(0)
+      setApples(generateGrid())
+      setToolUsage({
+        plus: 3,
+        minus: 3,
+        random: 3,
+        reset: 1,
+      })
+      setGameResult(null)
     }
   }
 
