@@ -30,6 +30,13 @@ const games: Game[] = [
     description: '같은 색상의 타일을 연결하여 점수를 얻는 게임입니다.',
     imageUrl: '/images/tile-game-demo3.gif',
     path: '/color-tiles'
+  },
+  {
+    id: 'space-meditation',
+    title: '별멍',
+    description: '별 조각을 별 조각을 생성하고 감상합니다.',
+    imageUrl: '/images/star-meditation-thumbnail.gif',
+    path: '/space-meditation'
   }
 ];
 
