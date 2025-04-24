@@ -37,6 +37,13 @@ const games: Game[] = [
     description: '별 조각을 별 조각을 생성하고 감상합니다.',
     imageUrl: '/images/star-meditation-thumbnail.gif',
     path: '/space-meditation'
+  },
+  {
+    id: 'dodge-game',
+    title: '닷지 게임',
+    description: '총알을 피하면서 버티는 게임입니다.',
+    imageUrl: '/images/dodge-game-thumbnail.gif',
+    path: '/dodge-game'
   }
 ];
 
