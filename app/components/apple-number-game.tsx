@@ -674,6 +674,8 @@ export default function AppleNumberGame() {
       setScore(0)
       setOpponentScore(0)
       setGameResult(null)
+      setTimeLeft(120) // 타이머 초기화 추가
+      setResetKey(prev => prev + 1) // 타이머 리셋 키 업데이트 추가
       if (options && typeof options.rottenMode === 'boolean') {
         setRottenMode(options.rottenMode)
       } else {
@@ -692,6 +694,9 @@ export default function AppleNumberGame() {
         reset: 1,
       })
       setGameResult(null)
+      // 타이머 관련 상태 초기화 추가
+      setTimeLeft(120)
+      setResetKey(prev => prev + 1)
     })
     return () => {
       socket.off("roomCreated")
@@ -788,6 +793,9 @@ export default function AppleNumberGame() {
         reset: 1,
       })
       setGameResult(null)
+      // 타이머 관련 상태 초기화 추가
+      setTimeLeft(120)
+      setResetKey(prev => prev + 1)
     }
   }
 
@@ -1337,12 +1345,17 @@ export default function AppleNumberGame() {
                 <span className="text-2xl ml-2 text-gray-600">점</span>
               </div>
               {roomId && (
-                <div className="mb-4 text-2xl font-bold">
-                  {gameResult && (
-                    <span className={gameResult === "승리!" ? "text-blue-600" : gameResult === "패배..." ? "text-red-500" : "text-gray-700"}>
-                      {gameResult}
-                    </span>
-                  )}
+                <div className="mb-4">
+                  <div className="text-2xl font-bold">
+                    {gameResult && (
+                      <span className={gameResult === "승리!" ? "text-blue-600" : gameResult === "패배..." ? "text-red-500" : "text-gray-700"}>
+                        {gameResult}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2 text-lg text-gray-600">
+                    상대방: {opponentScore}점
+                  </div>
                 </div>
               )}
               {(!roomId || isHost) ? (
